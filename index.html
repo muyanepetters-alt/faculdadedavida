@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FDV — Lista de Leads</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header">
+  <div class="header-brand">
+    <span class="brand-abbr">FDV</span>
+    <div class="brand-sep"></div>
+    <span class="brand-full">Faculdade da Vida</span>
+  </div>
+  <nav class="header-nav">
+    <a href="#" class="nav-link active">Leads</a>
+    <a href="#" class="nav-link">Agendamentos</a>
+    <a href="#" class="nav-link">Relatórios</a>
+  </nav>
+  <div class="header-right">
+    <span class="online-dot"></span>
+    <span class="online-label">online</span>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="app-main">
+
+  <!-- Page header -->
+  <div class="page-top">
+    <div class="page-title-block">
+      <h1>Lista de Leads</h1>
+      <p>Gerencie e agende suas conversas comerciais</p>
+    </div>
+    <button class="btn-primary" id="btn-novo-lead">+ Novo Lead</button>
+  </div>
+
+  <!-- Demo banner (shown when Firebase not configured) -->
+  <div class="demo-banner" id="demo-banner" style="display:none">
+    ⚡ Modo demonstração — configure o Firebase em <code>app.js</code> para persistir dados reais.
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-top">
+        <span class="stat-label">Total</span>
+        <span class="stat-icon">◈</span>
+      </div>
+      <strong class="stat-num" id="stat-total">0</strong>
+      <span class="stat-sub">leads cadastrados</span>
+    </div>
+    <div class="stat-card accent-gold">
+      <div class="stat-top">
+        <span class="stat-label">Aguardando</span>
+        <span class="stat-icon">◷</span>
+      </div>
+      <strong class="stat-num" id="stat-aguardando">0</strong>
+      <span class="stat-sub">para agendar</span>
+    </div>
+    <div class="stat-card accent-petro">
+      <div class="stat-top">
+        <span class="stat-label">Agendados</span>
+        <span class="stat-icon">◉</span>
+      </div>
+      <strong class="stat-num" id="stat-agendado">0</strong>
+      <span class="stat-sub">calls marcadas</span>
+    </div>
+    <div class="stat-card accent-green">
+      <div class="stat-top">
+        <span class="stat-label">Realizadas</span>
+        <span class="stat-icon">✦</span>
+      </div>
+      <strong class="stat-num" id="stat-realizada">0</strong>
+      <span class="stat-sub">calls concluídas</span>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="filter-label" for="filter-origem">Origem</label>
+        <select class="filter-select" id="filter-origem">
+          <option value="">Todas as origens</option>
+          <option value="Instagram">Instagram</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Indicação">Indicação</option>
+          <option value="Google">Google</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label" for="filter-status">Status</label>
+        <select class="filter-select" id="filter-status">
+          <option value="">Todos os status</option>
+          <option value="aguardando">Aguardando agendamento</option>
+          <option value="agendado">Agendado</option>
+          <option value="realizada">Call realizada</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label" for="filter-mes">Mês</label>
+        <select class="filter-select" id="filter-mes">
+          <option value="">Todos os meses</option>
+        </select>
+      </div>
+      <div class="filter-group filter-group--search">
+        <label class="filter-label" for="filter-busca">Buscar</label>
+        <div class="search-wrap">
+          <input type="text" class="filter-input" id="filter-busca" placeholder="Nome ou celular...">
+          <span class="search-ico" aria-hidden="true">⌕</span>
+        </div>
+      </div>
+      <button class="btn-clear" id="btn-limpar">Limpar</button>
+    </div>
+    <div class="results-info" id="results-info">Carregando...</div>
+  </div>
+
+  <!-- Table (desktop / tablet) -->
+  <div class="table-wrap" id="table-wrap">
+    <div class="loading-layer" id="loading-layer">
+      <div class="spinner"></div>
+      <span>Carregando leads…</span>
+    </div>
+
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Celular</th>
+          <th>Origem</th>
+          <th>Profissão</th>
+          <th>Renda Mensal</th>
+          <th>Chegou em</th>
+          <th>Status</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody id="leads-tbody"></tbody>
+    </table>
+
+    <div class="empty-state" id="empty-state" style="display:none">
+      <div class="empty-ico">◈</div>
+      <h3>Nenhum lead encontrado</h3>
+      <p>Ajuste os filtros ou cadastre um novo lead.</p>
+    </div>
+  </div>
+
+  <!-- Cards (mobile) -->
+  <div class="leads-cards" id="leads-cards"></div>
+
+</main>
+
+<!-- ===== MODAL AGENDAR / REALIZAR ===== -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="modal-title">Agendar Call</h2>
+        <p class="modal-subtitle" id="modal-subtitle">—</p>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Lead summary strip -->
+      <div class="lead-strip" id="lead-strip"></div>
+
+      <!-- Form: Agendar -->
+      <div id="form-agendar">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="input-data">Data da Call <span class="req">*</span></label>
+            <input type="date" id="input-data" class="form-ctrl" required>
+          </div>
+          <div class="form-group">
+            <label for="input-hora">Horário <span class="req">*</span></label>
+            <input type="time" id="input-hora" class="form-ctrl" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="input-obs">Observações</label>
+          <textarea id="input-obs" class="form-ctrl" rows="3"
+            placeholder="Contexto, interesse demonstrado, pontos de atenção…"></textarea>
+        </div>
+      </div>
+
+      <!-- Form: Marcar Realizada -->
+      <div id="form-realizada" style="display:none">
+        <p class="confirm-msg">Deseja marcar esta call como <strong>realizada</strong>?</p>
+        <div class="form-group">
+          <label for="input-resultado">Resultado da Call</label>
+          <select id="input-resultado" class="form-ctrl">
+            <option value="interessado">Interessado — continua no funil</option>
+            <option value="nao_interessado">Não interessado</option>
+            <option value="reagendar">Precisa reagendar</option>
+            <option value="matriculado">Matriculado ✓</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <label for="input-obs-call">Observações da Call</label>
+          <textarea id="input-obs-call" class="form-ctrl" rows="3"
+            placeholder="Resumo da conversa…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" id="btn-cancelar">Cancelar</button>
+      <button class="btn-confirm" id="btn-confirmar">Confirmar</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TOASTS ===== -->
+<div class="toast-dock" id="toast-dock"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
