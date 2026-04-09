@@ -11,8 +11,33 @@
 </head>
 <body>
 
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-abbr">FDV</span>
+      <div class="login-sep"></div>
+      <span class="login-brand-name">Faculdade da Vida</span>
+    </div>
+    <div>
+      <h1 class="login-title">Sistema Comercial</h1>
+      <p class="login-sub">Acesse com sua conta Google para continuar</p>
+    </div>
+    <button class="btn-google" id="btn-login-google">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"/>
+        <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z"/>
+      </svg>
+      Entrar com Google
+    </button>
+    <p class="login-error" id="login-error" style="display:none"></p>
+  </div>
+</div>
+
 <!-- ===== HEADER ===== -->
-<header class="app-header">
+<header class="app-header" id="app-header" style="display:none">
   <div class="header-brand">
     <span class="brand-abbr">FDV</span>
     <div class="brand-sep"></div>
@@ -24,13 +49,18 @@
     <a href="#" class="nav-link">Relatórios</a>
   </nav>
   <div class="header-right">
+    <div class="user-info">
+      <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none">
+      <span class="user-name" id="user-name"></span>
+    </div>
+    <button class="btn-logout" id="btn-logout">Sair</button>
     <span class="online-dot"></span>
     <span class="online-label">online</span>
   </div>
 </header>
 
 <!-- ===== MAIN ===== -->
-<main class="app-main">
+<main class="app-main" id="app-main" style="display:none">
 
   <!-- Page header -->
   <div class="page-top">
@@ -47,38 +77,36 @@
   </div>
 
   <!-- Stats -->
-  <div class="stats-grid">
+  <div class="stats-grid stats-grid--6">
     <div class="stat-card">
-      <div class="stat-top">
-        <span class="stat-label">Total</span>
-        <span class="stat-icon">◈</span>
-      </div>
+      <div class="stat-top"><span class="stat-label">Total</span><span class="stat-icon">◈</span></div>
       <strong class="stat-num" id="stat-total">0</strong>
       <span class="stat-sub">leads cadastrados</span>
     </div>
     <div class="stat-card accent-gold">
-      <div class="stat-top">
-        <span class="stat-label">Aguardando</span>
-        <span class="stat-icon">◷</span>
-      </div>
+      <div class="stat-top"><span class="stat-label">Aguardando</span><span class="stat-icon">◷</span></div>
       <strong class="stat-num" id="stat-aguardando">0</strong>
       <span class="stat-sub">para agendar</span>
     </div>
     <div class="stat-card accent-petro">
-      <div class="stat-top">
-        <span class="stat-label">Agendados</span>
-        <span class="stat-icon">◉</span>
-      </div>
+      <div class="stat-top"><span class="stat-label">Agendados</span><span class="stat-icon">◉</span></div>
       <strong class="stat-num" id="stat-agendado">0</strong>
       <span class="stat-sub">calls marcadas</span>
     </div>
+    <div class="stat-card accent-marsala">
+      <div class="stat-top"><span class="stat-label">No Show</span><span class="stat-icon">✕</span></div>
+      <strong class="stat-num" id="stat-noshow">0</strong>
+      <span class="stat-sub">não compareceram</span>
+    </div>
     <div class="stat-card accent-green">
-      <div class="stat-top">
-        <span class="stat-label">Realizadas</span>
-        <span class="stat-icon">✦</span>
-      </div>
+      <div class="stat-top"><span class="stat-label">Realizadas</span><span class="stat-icon">✦</span></div>
       <strong class="stat-num" id="stat-realizada">0</strong>
       <span class="stat-sub">calls concluídas</span>
+    </div>
+    <div class="stat-card accent-sand">
+      <div class="stat-top"><span class="stat-label">Vendas</span><span class="stat-icon">◆</span></div>
+      <strong class="stat-num" id="stat-vendas">0</strong>
+      <span class="stat-sub">vendas fechadas</span>
     </div>
   </div>
 
@@ -126,6 +154,22 @@
     <div class="results-info" id="results-info">Carregando...</div>
   </div>
 
+  <!-- Bulk action bar -->
+  <div class="bulk-bar" id="bulk-bar" style="display:none">
+    <span class="bulk-count" id="bulk-count">0 selecionados</span>
+    <div class="bulk-actions">
+      <button class="btn-ghost btn-sm" id="btn-bulk-delete">Excluir selecionados</button>
+      <select id="bulk-status-sel" class="filter-select bulk-status-sel">
+        <option value="">Mudar status…</option>
+        <option value="aguardando">Aguardando</option>
+        <option value="agendado">Agendado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
+      <button class="btn-ghost btn-sm" id="btn-bulk-status">Aplicar</button>
+    </div>
+    <button class="btn-ghost btn-sm" id="btn-bulk-clear">✕ Limpar</button>
+  </div>
+
   <!-- Table (desktop / tablet) -->
   <div class="table-wrap" id="table-wrap">
     <div class="loading-layer" id="loading-layer">
@@ -136,14 +180,13 @@
     <table class="leads-table">
       <thead>
         <tr>
+          <th class="cell-chk"><input type="checkbox" id="chk-all" title="Selecionar todos"></th>
           <th>Nome</th>
           <th>Celular</th>
           <th>Origem</th>
-          <th>Profissão</th>
           <th>Renda Mensal</th>
-          <th>Chegou em</th>
           <th>Status</th>
-          <th>Ação</th>
+          <th>Ações</th>
         </tr>
       </thead>
       <tbody id="leads-tbody"></tbody>
@@ -334,6 +377,121 @@
       <button class="btn-confirm" id="btn-confirmar">Confirmar</button>
     </div>
 
+  </div>
+</div>
+
+<!-- ===== MODAL PERFIL DO LEAD ===== -->
+<div class="modal-backdrop" id="perfil-backdrop">
+  <div class="modal modal--wide" id="modal-perfil" role="dialog" aria-modal="true" aria-labelledby="perfil-title">
+
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="perfil-title">—</h2>
+        <p class="modal-subtitle" id="perfil-subtitle">—</p>
+      </div>
+      <button class="modal-close" id="perfil-close" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Dados pessoais -->
+      <div class="detalhes-section-title">Dados Pessoais</div>
+      <div class="perfil-grid" id="perfil-dados"></div>
+
+      <!-- Perfil -->
+      <div id="perfil-perfil-wrap" style="display:none">
+        <div class="detalhes-section-title">Perfil</div>
+        <div class="perfil-grid" id="perfil-perfil"></div>
+      </div>
+
+      <!-- Origem -->
+      <div id="perfil-origem-wrap" style="display:none">
+        <div class="detalhes-section-title">Origem</div>
+        <div class="perfil-grid" id="perfil-origem"></div>
+      </div>
+
+      <!-- Observações (editável) -->
+      <div id="perfil-obs-wrap">
+        <div class="detalhes-section-title">Observações</div>
+        <textarea class="form-ctrl" id="perfil-obs" rows="4"
+          placeholder="Notas e observações sobre o lead…"></textarea>
+      </div>
+
+      <!-- Histórico -->
+      <div class="detalhes-section-title">Histórico</div>
+      <div class="perfil-historico" id="perfil-historico"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" id="perfil-fechar">Fechar</button>
+      <button class="btn-confirm" id="btn-salvar-obs">Salvar observações</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODAL NOVO / EDITAR LEAD ===== -->
+<div class="modal-backdrop" id="novo-lead-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="novo-lead-title">Novo Lead</h2>
+        <p class="modal-subtitle">Preencha os dados do lead</p>
+      </div>
+      <button class="modal-close" id="novo-lead-close" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="nl-nome">Nome <span class="req">*</span></label>
+          <input type="text" id="nl-nome" class="form-ctrl" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label for="nl-celular">Celular <span class="req">*</span></label>
+          <input type="text" id="nl-celular" class="form-ctrl" placeholder="(11) 99999-9999">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="nl-email">E-mail</label>
+          <input type="email" id="nl-email" class="form-ctrl" placeholder="email@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label for="nl-instagram">Instagram</label>
+          <input type="text" id="nl-instagram" class="form-ctrl" placeholder="@usuario">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="nl-profissao">Profissão</label>
+          <input type="text" id="nl-profissao" class="form-ctrl" placeholder="Profissão">
+        </div>
+        <div class="form-group">
+          <label for="nl-renda">Renda Mensal</label>
+          <input type="text" id="nl-renda" class="form-ctrl" placeholder="R$ 0.000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="nl-origem">Origem</label>
+        <select id="nl-origem" class="form-ctrl">
+          <option value="">Selecione a origem…</option>
+          <option value="Instagram">Instagram</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Indicação">Indicação</option>
+          <option value="Google">Google</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="nl-obs">Observações</label>
+        <textarea id="nl-obs" class="form-ctrl" rows="3"
+          placeholder="Notas iniciais sobre o lead…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" id="novo-lead-cancelar">Cancelar</button>
+      <button class="btn-confirm" id="btn-salvar-lead">Cadastrar Lead</button>
+    </div>
   </div>
 </div>
 

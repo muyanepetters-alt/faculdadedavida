@@ -29,8 +29,11 @@
 import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
   getFirestore, collection, onSnapshot,
-  doc, updateDoc, addDoc
+  doc, updateDoc, addDoc, deleteDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const CLOSERS = {
   fernanda: { name: 'Fernanda', color: '#CE9221', bg: 'rgba(206,146,33,.12)', calLink: 'https://calendar.app.google/hWWi6tVKAhoXg5cUA' },
@@ -68,6 +71,11 @@ let currentId     = null;
 let modalMode     = 'agendar';
 let db            = null;
 let isLive        = false;
+let selectedIds   = new Set();
+let perfilLeadId  = null;
+let novoLeadId    = null;
+let auth          = null;
+let leadsLoaded   = false;
 
 // agendamento state
 let cal = {
@@ -75,6 +83,75 @@ let cal = {
   closer:   null,  // 'fernanda' | 'thomaz'
   leadSnap: null
 };
+
+// ─── AUTH ────────────────────────────────────────────────────────────
+function initAuth() {
+  isLive = initFirebase();
+
+  if (!isLive) {
+    // Demo mode — skip auth, go straight to app
+    $('login-screen').style.display = 'none';
+    $('app-header').style.display   = '';
+    $('app-main').style.display     = '';
+    loadLeads();
+    return;
+  }
+
+  auth = getAuth();
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      // Logged in
+      $('login-screen').style.display = 'none';
+      $('app-header').style.display   = '';
+      $('app-main').style.display     = '';
+
+      // Populate user info in header
+      const avatar = $('user-avatar');
+      if (user.photoURL) {
+        avatar.src           = user.photoURL;
+        avatar.style.display = '';
+      }
+      $('user-name').textContent = user.displayName || user.email;
+
+      if (!leadsLoaded) {
+        leadsLoaded = true;
+        loadLeads();
+      }
+    } else {
+      // Not logged in — show login screen
+      $('login-screen').style.display = '';
+      $('app-header').style.display   = 'none';
+      $('app-main').style.display     = 'none';
+      leadsLoaded = false;
+    }
+  });
+}
+
+async function loginWithGoogle() {
+  const btn = $('btn-login-google');
+  const err = $('login-error');
+  btn.disabled      = true;
+  err.style.display = 'none';
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (e) {
+    err.textContent   = 'Erro ao entrar. Tente novamente.';
+    err.style.display = 'block';
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function logoutUser() {
+  try {
+    leadsLoaded = false;
+    await signOut(auth);
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 // ─── INIT FIREBASE ───────────────────────────────────────────────────
 function initFirebase() {
@@ -129,7 +206,10 @@ function loadLeads() {
     allLeads = snap.docs.map(d => {
       const data = d.data();
       console.log(`[FDV] Lead: ${data.nome} | status: ${data.status} | datachegada: ${data.datachegada}`);
-      return { id: d.id, ...data };
+      const lead = { id: d.id, ...data };
+      // normaliza: Apps Script grava "telefone", app usa "celular"
+      if (!lead.celular && lead.telefone) lead.celular = lead.telefone;
+      return lead;
     });
 
     overlay.style.display = 'none';
@@ -246,8 +326,7 @@ function renderAll() {
   // Ordena por datachegada decrescente no cliente (sem precisar de índice no Firestore)
   allLeads.sort((a, b) => (b.datachegada || '').localeCompare(a.datachegada || ''));
   populateMonths();
-  applyFilters();
-  updateStats();
+  applyFilters(); // chama updateStats internamente
 }
 
 function applyFilters() {
@@ -271,6 +350,7 @@ function applyFilters() {
   renderTable();
   renderCards();
   updateCount();
+  updateStats();
 }
 
 // ─── TABLE ───────────────────────────────────────────────────────────
@@ -281,25 +361,55 @@ function renderTable() {
   if (!filteredLeads.length) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
+    $('chk-all').checked = false;
     return;
   }
   empty.style.display = 'none';
 
   tbody.innerHTML = filteredLeads.map(l => /* html */`
-    <tr data-id="${l.id}">
-      <td class="cell-nome">${esc(l.nome || '—')}</td>
+    <tr data-id="${l.id}" class="${selectedIds.has(l.id) ? 'row-selected' : ''}">
+      <td class="cell-chk">
+        <input type="checkbox" class="row-chk" data-id="${l.id}"
+          ${selectedIds.has(l.id) ? 'checked' : ''}>
+      </td>
+      <td class="cell-nome"><button class="nome-link" data-perfil="${l.id}">${esc(l.nome || '—')}</button></td>
       <td class="cell-fone">${esc(l.celular || '—')}</td>
       <td>${badgeOrigem(l.origem)}</td>
-      <td class="cell-prof">${esc(l.profissao || '—')}</td>
       <td class="cell-renda">${esc(l.renda || '—')}</td>
-      <td class="cell-data">${fmtDate(l.datachegada)}</td>
       <td>${badgeStatus(l.status)}</td>
-      <td>${btnAcao(l)}</td>
+      <td class="cell-acoes">${btnAcao(l)}</td>
     </tr>
   `).join('');
 
+  // select-all state
+  const allChecked = filteredLeads.length > 0 && filteredLeads.every(l => selectedIds.has(l.id));
+  $('chk-all').checked = allChecked;
+  $('chk-all').indeterminate = !allChecked && filteredLeads.some(l => selectedIds.has(l.id));
+
+  tbody.querySelectorAll('.row-chk').forEach(chk =>
+    chk.addEventListener('change', () => {
+      if (chk.checked) selectedIds.add(chk.dataset.id);
+      else             selectedIds.delete(chk.dataset.id);
+      updateBulkBar();
+      const row = chk.closest('tr');
+      row.classList.toggle('row-selected', chk.checked);
+      const allNowChecked = filteredLeads.every(l => selectedIds.has(l.id));
+      $('chk-all').checked = allNowChecked;
+      $('chk-all').indeterminate = !allNowChecked && filteredLeads.some(l => selectedIds.has(l.id));
+    })
+  );
+  tbody.querySelectorAll('[data-perfil]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const lead = allLeads.find(l => l.id === b.dataset.perfil);
+      if (lead) openPerfil(lead);
+    })
+  );
   tbody.querySelectorAll('[data-action]').forEach(b =>
-    b.addEventListener('click', () => handleAction(b.dataset.id, b.dataset.action))
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      handleAction(b.dataset.id, b.dataset.action);
+    })
   );
   tbody.querySelectorAll('[data-postcall]').forEach(b =>
     b.addEventListener('click', e => {
@@ -328,7 +438,7 @@ function renderCards() {
     <div class="lead-card" data-id="${l.id}">
       <div class="card-head">
         <div>
-          <div class="card-nome">${esc(l.nome || '—')}</div>
+          <button class="card-nome nome-link" data-perfil="${l.id}">${esc(l.nome || '—')}</button>
           <div class="card-fone">${esc(l.celular || '—')}</div>
         </div>
         <div class="card-badges">
@@ -353,6 +463,13 @@ function renderCards() {
     </div>
   `).join('');
 
+  wrap.querySelectorAll('[data-perfil]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const lead = allLeads.find(l => l.id === b.dataset.perfil);
+      if (lead) openPerfil(lead);
+    })
+  );
   wrap.querySelectorAll('[data-action]').forEach(b =>
     b.addEventListener('click', () => handleAction(b.dataset.id, b.dataset.action))
   );
@@ -385,22 +502,32 @@ function badgeStatus(s) {
 }
 
 function btnAcao(l) {
-  if (l.status === 'aguardando')
-    return `<button class="btn-acao agendar" data-id="${l.id}" data-action="agendar">Agendar</button>`;
-  if (l.status === 'agendado')
-    return `
-      <div class="realize-wrap" data-leadid="${l.id}">
-        <button class="btn-acao realizar" data-id="${l.id}" data-action="realizar">Marcar Realizada</button>
-        <div class="realize-dropdown">
-          <button class="realize-opt opt-realizada" data-id="${l.id}" data-postcall="realizada">✅ Call Realizada</button>
-          <button class="realize-opt opt-noshow"    data-id="${l.id}" data-postcall="noshow">❌ No Show</button>
-          <button class="realize-opt opt-remarcar"  data-id="${l.id}" data-postcall="remarcar">🔄 Remarcar</button>
-          <button class="realize-opt opt-cancelado" data-id="${l.id}" data-postcall="cancelado">🚫 Cancelado</button>
-        </div>
-      </div>`;
-  if (l.status === 'noshow')
-    return `<button class="btn-acao agendar" data-id="${l.id}" data-action="agendar">Remarcar</button>`;
-  return `<button class="btn-acao ver" data-id="${l.id}" data-action="ver">Ver detalhes</button>`;
+  const id = l.id;
+  const canAgendar  = l.status !== 'cancelado';
+  const canRemarcar = l.status === 'agendado' || l.status === 'noshow';
+  const isAgendado  = l.status === 'agendado';
+  const isRealizada = l.status === 'realizada';
+
+  const opts = [
+    canAgendar  ? `<button class="acao-opt opt-agendar"   data-id="${id}" data-action="agendar">📅 Agendar</button>` : '',
+                  `<button class="acao-opt opt-qualificar" data-id="${id}" data-action="qualificar">🔍 Qualificar</button>`,
+    canRemarcar ? `<button class="acao-opt opt-remarcar"   data-id="${id}" data-action="agendar">🔄 Remarcar</button>` : '',
+    isRealizada ? `<button class="acao-opt opt-ver"        data-id="${id}" data-action="ver">📋 Ver detalhes</button>` : '',
+    isAgendado  ? `<div class="acao-sep"></div>
+                   <button class="acao-opt opt-realizada" data-id="${id}" data-postcall="realizada">✅ Call Realizada</button>
+                   <button class="acao-opt opt-noshow"    data-id="${id}" data-postcall="noshow">❌ No Show</button>
+                   <button class="acao-opt opt-cancelado" data-id="${id}" data-postcall="cancelado">🚫 Cancelado</button>` : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <div class="acoes-cell">
+      <div class="acoes-wrap" data-leadid="${id}">
+        <button class="btn-acao-main" data-id="${id}" data-action="menu">Ações ▾</button>
+        <div class="acoes-dropdown">${opts}</div>
+      </div>
+      <button class="btn-icon btn-editar" data-id="${id}" data-action="editar" title="Editar lead">✏</button>
+      <button class="btn-icon btn-excluir" data-id="${id}" data-action="excluir" title="Excluir lead">🗑</button>
+    </div>`;
 }
 
 function fmtDate(d) {
@@ -418,10 +545,17 @@ function esc(s) {
 
 // ─── STATS ───────────────────────────────────────────────────────────
 function updateStats() {
-  $('stat-total').textContent      = allLeads.length;
-  $('stat-aguardando').textContent = allLeads.filter(l => l.status === 'aguardando').length;
-  $('stat-agendado').textContent   = allLeads.filter(l => l.status === 'agendado').length;
-  $('stat-realizada').textContent  = allLeads.filter(l => l.status === 'realizada').length;
+  const mes  = $('filter-mes').value;
+  const base = mes
+    ? allLeads.filter(l => (l.datachegada || '').startsWith(mes))
+    : allLeads;
+
+  $('stat-total').textContent      = base.length;
+  $('stat-aguardando').textContent = base.filter(l => l.status === 'aguardando').length;
+  $('stat-agendado').textContent   = base.filter(l => l.status === 'agendado').length;
+  $('stat-noshow').textContent     = base.filter(l => l.status === 'noshow').length;
+  $('stat-realizada').textContent  = base.filter(l => l.status === 'realizada').length;
+  $('stat-vendas').textContent     = base.filter(l => l.venda_realizada === true).length;
 }
 
 function updateCount() {
@@ -457,9 +591,87 @@ function handleAction(id, action) {
   const lead = allLeads.find(l => l.id === id);
   if (!lead) return;
 
-  if (action === 'agendar')       openAgendar(lead);
-  else if (action === 'realizar') toggleRealizeDropdown(id);
-  else verDetalhes(lead);
+  if (action === 'menu') { toggleAcoesDropdown(id); return; }
+  closeAllDropdowns();
+  if      (action === 'agendar')    openAgendar(lead);
+  else if (action === 'qualificar') openPerfil(lead);
+  else if (action === 'ver')        verDetalhes(lead);
+  else if (action === 'editar')     openNovoLead(lead);
+  else if (action === 'excluir')    deleteLead(id);
+}
+
+// ─── DELETE ──────────────────────────────────────────────────────────
+async function deleteLead(id) {
+  if (!confirm('Excluir este lead? Esta ação não pode ser desfeita.')) return;
+  try {
+    if (isLive) {
+      await deleteDoc(doc(db, 'leads', id));
+    } else {
+      allLeads = allLeads.filter(l => l.id !== id);
+      renderAll();
+    }
+    selectedIds.delete(id);
+    updateBulkBar();
+    toast('Lead excluído.', 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao excluir. Tente novamente.', 'err');
+  }
+}
+
+// ─── BULK ─────────────────────────────────────────────────────────────
+function updateBulkBar() {
+  const n   = selectedIds.size;
+  const bar = $('bulk-bar');
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  $('bulk-count').textContent = `${n} selecionado${n !== 1 ? 's' : ''}`;
+}
+
+async function bulkDelete() {
+  const n = selectedIds.size;
+  if (!n) return;
+  if (!confirm(`Excluir ${n} lead(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+  try {
+    if (isLive) {
+      await Promise.all([...selectedIds].map(id => deleteDoc(doc(db, 'leads', id))));
+    } else {
+      allLeads = allLeads.filter(l => !selectedIds.has(l.id));
+      renderAll();
+    }
+    selectedIds.clear();
+    updateBulkBar();
+    toast(`${n} lead(s) excluído(s).`, 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao excluir. Tente novamente.', 'err');
+  }
+}
+
+async function bulkChangeStatus() {
+  const status = $('bulk-status-sel').value;
+  const n = selectedIds.size;
+  if (!status || !n) { toast('Selecione um status para aplicar.', 'err'); return; }
+  try {
+    const now = new Date().toISOString();
+    if (isLive) {
+      await Promise.all([...selectedIds].map(id =>
+        updateDoc(doc(db, 'leads', id), { status, atualizadoem: now })
+      ));
+    } else {
+      selectedIds.forEach(id => {
+        const i = allLeads.findIndex(l => l.id === id);
+        if (i !== -1) allLeads[i] = { ...allLeads[i], status, atualizadoem: now };
+      });
+      renderAll();
+    }
+    toast(`Status atualizado para "${status}" em ${n} lead(s).`, 'ok');
+    selectedIds.clear();
+    $('bulk-status-sel').value = '';
+    updateBulkBar();
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao atualizar status.', 'err');
+  }
 }
 
 function openAgendar(lead) {
@@ -483,6 +695,169 @@ function openAgendar(lead) {
   openModal();
 }
 
+
+// ─── MODAL PERFIL DO LEAD ────────────────────────────────────────────
+function instagramLink(raw) {
+  if (!raw) return '—';
+  const user = String(raw).replace(/^@/, '').trim();
+  if (!user) return '—';
+  return `<a href="https://instagram.com/${esc(user)}" target="_blank" rel="noopener noreferrer" style="color:var(--gold)">@${esc(user)}</a>`;
+}
+
+function openPerfil(lead) {
+  perfilLeadId = lead.id;
+
+  const STATUS_LBL = {
+    aguardando: 'Aguardando', agendado: 'Agendado',
+    realizada: 'Call Realizada', noshow: 'No Show', cancelado: 'Cancelado'
+  };
+
+  $('perfil-title').textContent    = lead.nome || '—';
+  $('perfil-subtitle').textContent = STATUS_LBL[lead.status] || lead.status || '—';
+
+  // ── Dados pessoais ──────────────────────────────────────────────────
+  const celular = lead.celular || lead.telefone || '—';
+  $('perfil-dados').innerHTML = [
+    { l: 'Nome',      v: lead.nome      || '—' },
+    { l: 'Celular',   v: celular },
+    { l: 'E-mail',    v: lead.email     || '—' },
+    { l: 'Instagram', v: lead.instagram || null, ig: true },
+    { l: 'Profissão', v: lead.profissao || '—' },
+    { l: 'Renda',     v: lead.renda     || '—' },
+    { l: 'Idade',     v: lead.idade     || '—' },
+  ].map(({ l, v, ig }) => `
+    <div class="detalhes-item">
+      <span class="detalhes-lbl">${esc(l)}</span>
+      <span class="detalhes-val">${ig ? instagramLink(v) : esc(v || '—')}</span>
+    </div>`).join('');
+
+  // ── Perfil ──────────────────────────────────────────────────────────
+  const perfilItems = [
+    { l: 'Desafio',           v: lead.desafio      || '' },
+    { l: 'Motivação',         v: lead.motivacao    || '' },
+    { l: 'Já participou',     v: lead.jaParticipou || '' },
+    { l: 'Já é aluna',        v: lead.jaEAluna     || '' },
+    { l: 'Tempo que conhece', v: lead.tempoConhece || '' },
+    { l: 'De onde conhece',   v: lead.deOnde       || '' },
+  ].filter(c => c.v);
+
+  const perfilWrap = $('perfil-perfil-wrap');
+  if (perfilItems.length) {
+    $('perfil-perfil').innerHTML = perfilItems.map(({ l, v }) => `
+      <div class="detalhes-item">
+        <span class="detalhes-lbl">${esc(l)}</span>
+        <span class="detalhes-val">${esc(v)}</span>
+      </div>`).join('');
+    perfilWrap.style.display = 'block';
+  } else {
+    perfilWrap.style.display = 'none';
+  }
+
+  // ── Origem ──────────────────────────────────────────────────────────
+  const origemItems = [
+    { l: 'Origem',       v: lead.origem       || '' },
+    { l: 'UTM Campaign', v: lead.utm_campaign || '' },
+    { l: 'UTM Medium',   v: lead.utm_medium   || '' },
+    { l: 'UTM Content',  v: lead.utm_content  || '' },
+    { l: 'UTM Source',   v: lead.utm_source   || '' },
+  ].filter(c => c.v);
+
+  const origemWrap = $('perfil-origem-wrap');
+  if (origemItems.length) {
+    $('perfil-origem').innerHTML = origemItems.map(({ l, v }) => `
+      <div class="detalhes-item">
+        <span class="detalhes-lbl">${esc(l)}</span>
+        <span class="detalhes-val">${esc(v)}</span>
+      </div>`).join('');
+    origemWrap.style.display = 'block';
+  } else {
+    origemWrap.style.display = 'none';
+  }
+
+  // ── Observações (textarea editável) ────────────────────────────────
+  $('perfil-obs').value = lead.observacoes || '';
+
+  // ── Histórico ───────────────────────────────────────────────────────
+  const hist = buildHistorico(lead);
+  $('perfil-historico').innerHTML = hist.length
+    ? hist.map(h => `
+      <div class="hist-item">
+        <span class="hist-ico">${h.ico}</span>
+        <div class="hist-body">
+          <div class="hist-label">${esc(h.label)}</div>
+          ${h.sub ? `<div class="hist-sub">${esc(h.sub)}</div>` : ''}
+        </div>
+      </div>`).join('')
+    : '<p class="hist-empty">Nenhuma ação registrada.</p>';
+
+  $('perfil-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePerfil() {
+  $('perfil-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+  perfilLeadId = null;
+}
+
+async function salvarObsPerfil() {
+  if (!perfilLeadId) return;
+  const obs = $('perfil-obs').value.trim();
+  const btn = $('btn-salvar-obs');
+  btn.disabled = true;
+  try {
+    await saveLead(perfilLeadId, { observacoes: obs, atualizadoem: new Date().toISOString() });
+    toast('Observações salvas.', 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao salvar. Tente novamente.', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function buildHistorico(lead) {
+  const items = [];
+
+  if (lead.datachegada) {
+    items.push({ ico: '◈', label: 'Lead cadastrado', sub: fmtDate(lead.datachegada) });
+  }
+
+  if (lead.dataagendamento) {
+    const closerName = lead.closer ? (CLOSERS[lead.closer]?.name || lead.closer) : null;
+    const sub = [
+      `${fmtDate(lead.dataagendamento)}${lead.horaagendamento ? ' às ' + lead.horaagendamento : ''}`,
+      closerName ? 'Closer: ' + closerName : null,
+    ].filter(Boolean).join(' · ');
+    items.push({ ico: '📅', label: 'Call agendada', sub });
+  }
+
+  if (lead.status === 'noshow') {
+    items.push({ ico: '❌', label: 'No Show registrado', sub: '' });
+  } else if (lead.status === 'cancelado') {
+    items.push({ ico: '🚫', label: 'Cancelado', sub: '' });
+  } else if (lead.status === 'realizada' || lead.realizadaem) {
+    const CLOSER_LBL = { followup:'Follow Up', fechamento:'Fechamento', venda_realizada:'Venda Realizada', venda_perdida:'Venda Perdida' };
+    const dataCall = lead.realizadaem
+      ? new Date(lead.realizadaem).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : fmtDate(lead.dataagendamento);
+    const sub = [
+      dataCall,
+      lead.venda_realizada === true  ? 'Venda realizada' : null,
+      lead.venda_realizada === false ? 'Sem venda'        : null,
+      lead.valor_venda ? lead.valor_venda : null,
+      lead.status_closer ? CLOSER_LBL[lead.status_closer] || lead.status_closer : null,
+      lead.temperatura ? lead.temperatura.charAt(0).toUpperCase() + lead.temperatura.slice(1) : null,
+    ].filter(Boolean).join(' · ');
+    items.push({ ico: '✅', label: 'Call realizada', sub });
+
+    if (lead.obs_call) {
+      items.push({ ico: '💬', label: 'Obs. da call', sub: lead.obs_call });
+    }
+  }
+
+  return items;
+}
 
 function verDetalhes(lead) {
   if (lead.status === 'realizada') {
@@ -592,16 +967,16 @@ function closeModal() {
   btn.textContent      = 'Confirmar';
 }
 
-// ─── REALIZE DROPDOWN ────────────────────────────────────────────────
+// ─── AÇÕES DROPDOWN ──────────────────────────────────────────────────
 function closeAllDropdowns() {
-  document.querySelectorAll('.realize-dropdown.open')
+  document.querySelectorAll('.acoes-dropdown.open')
     .forEach(d => d.classList.remove('open'));
 }
 
-function toggleRealizeDropdown(id) {
-  const wrap = document.querySelector(`.realize-wrap[data-leadid="${id}"]`);
+function toggleAcoesDropdown(id) {
+  const wrap = document.querySelector(`.acoes-wrap[data-leadid="${id}"]`);
   if (!wrap) return;
-  const dropdown = wrap.querySelector('.realize-dropdown');
+  const dropdown = wrap.querySelector('.acoes-dropdown');
   const isOpen   = dropdown.classList.contains('open');
   closeAllDropdowns();
   if (!isOpen) dropdown.classList.add('open');
@@ -842,6 +1217,74 @@ async function saveLead(id, data) {
   }
 }
 
+// ─── NOVO / EDITAR LEAD ──────────────────────────────────────────────
+function openNovoLead(lead = null) {
+  novoLeadId = lead ? lead.id : null;
+  $('novo-lead-title').textContent = lead ? 'Editar Lead' : 'Novo Lead';
+  $('btn-salvar-lead').textContent = lead ? 'Salvar alterações' : 'Cadastrar Lead';
+  $('nl-nome').value      = lead?.nome                          || '';
+  $('nl-celular').value   = lead?.celular || lead?.telefone     || '';
+  $('nl-email').value     = lead?.email                         || '';
+  $('nl-instagram').value = lead?.instagram                     || '';
+  $('nl-profissao').value = lead?.profissao                     || '';
+  $('nl-renda').value     = lead?.renda                         || '';
+  $('nl-origem').value    = lead?.origem                        || '';
+  $('nl-obs').value       = lead?.observacoes                   || '';
+  $('novo-lead-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => $('nl-nome').focus(), 50);
+}
+
+function closeNovoLead() {
+  $('novo-lead-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+  novoLeadId = null;
+}
+
+async function confirmarNovoLead() {
+  const nome    = $('nl-nome').value.trim();
+  const celular = $('nl-celular').value.trim();
+  if (!nome)    { toast('Preencha o nome do lead.', 'err'); return; }
+  if (!celular) { toast('Preencha o celular.', 'err'); return; }
+
+  const btn = $('btn-salvar-lead');
+  btn.disabled = true;
+
+  const data = {
+    nome, celular,
+    email:        $('nl-email').value.trim(),
+    instagram:    $('nl-instagram').value.trim(),
+    profissao:    $('nl-profissao').value.trim(),
+    renda:        $('nl-renda').value.trim(),
+    origem:       $('nl-origem').value,
+    observacoes:  $('nl-obs').value.trim(),
+    atualizadoem: new Date().toISOString(),
+  };
+
+  try {
+    if (novoLeadId) {
+      await saveLead(novoLeadId, data);
+      toast(`Lead atualizado — ${nome}`, 'ok');
+    } else {
+      data.status      = 'aguardando';
+      data.datachegada = new Date().toISOString().slice(0, 10);
+      data.criadoem    = new Date().toISOString();
+      if (isLive) {
+        await addDoc(collection(db, 'leads'), data);
+      } else {
+        allLeads.unshift({ id: 'local-' + Date.now(), ...data });
+        renderAll();
+      }
+      toast(`Lead cadastrado — ${nome}`, 'ok');
+    }
+    closeNovoLead();
+  } catch (e) {
+    console.error(e);
+    toast(e.message || 'Erro ao salvar. Tente novamente.', 'err');
+    btn.disabled = false;
+  }
+}
+
 // ─── TOAST ───────────────────────────────────────────────────────────
 function toast(msg, type = 'ok') {
   const dock = $('toast-dock');
@@ -878,7 +1321,7 @@ function bindEvents() {
 
   // fecha dropdown ao clicar fora
   document.addEventListener('click', e => {
-    if (!e.target.closest('.realize-wrap')) closeAllDropdowns();
+    if (!e.target.closest('.acoes-wrap')) closeAllDropdowns();
   });
 
   // agendamento: voltar ao passo 1
@@ -904,14 +1347,49 @@ function bindEvents() {
     }
   });
 
-  // new lead (placeholder)
-  $('btn-novo-lead').addEventListener('click', () =>
-    toast('Tela de cadastro em breve!', 'ok')
-  );
+  // novo lead button
+  $('btn-novo-lead').addEventListener('click', () => openNovoLead());
+
+  // select-all checkbox
+  $('chk-all').addEventListener('change', e => {
+    if (e.target.checked) filteredLeads.forEach(l => selectedIds.add(l.id));
+    else                  filteredLeads.forEach(l => selectedIds.delete(l.id));
+    updateBulkBar();
+    renderTable();
+  });
+
+  // bulk bar
+  $('btn-bulk-delete').addEventListener('click', bulkDelete);
+  $('btn-bulk-status').addEventListener('click', bulkChangeStatus);
+  $('btn-bulk-clear').addEventListener('click', () => {
+    selectedIds.clear();
+    updateBulkBar();
+    renderTable();
+  });
+
+  // perfil modal
+  $('perfil-close').addEventListener('click', closePerfil);
+  $('perfil-fechar').addEventListener('click', closePerfil);
+  $('btn-salvar-obs').addEventListener('click', salvarObsPerfil);
+  $('perfil-backdrop').addEventListener('click', e => {
+    if (e.target === $('perfil-backdrop')) closePerfil();
+  });
+
+  // novo lead modal
+  $('novo-lead-close').addEventListener('click', closeNovoLead);
+  $('novo-lead-cancelar').addEventListener('click', closeNovoLead);
+  $('btn-salvar-lead').addEventListener('click', confirmarNovoLead);
+  $('novo-lead-backdrop').addEventListener('click', e => {
+    if (e.target === $('novo-lead-backdrop')) closeNovoLead();
+  });
+
+  // auth buttons
+  $('btn-login-google').addEventListener('click', loginWithGoogle);
+  $('btn-logout').addEventListener('click', logoutUser);
 
   // keyboard
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') { closeModal(); closePerfil(); closeNovoLead(); }
   });
 }
 
@@ -919,6 +1397,5 @@ function bindEvents() {
 function $(id) { return document.getElementById(id); }
 
 // ─── BOOT ────────────────────────────────────────────────────────────
-isLive = initFirebase();
 bindEvents();
-loadLeads();
+initAuth();
