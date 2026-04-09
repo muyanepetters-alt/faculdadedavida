@@ -65,7 +65,7 @@ const DEMO = [
 let allLeads      = [];
 let filteredLeads = [];
 let currentId     = null;
-let modalMode     = 'agendar'; // 'agendar' | 'realizar'
+let modalMode     = 'agendar';
 let db            = null;
 let isLive        = false;
 
@@ -301,6 +301,14 @@ function renderTable() {
   tbody.querySelectorAll('[data-action]').forEach(b =>
     b.addEventListener('click', () => handleAction(b.dataset.id, b.dataset.action))
   );
+  tbody.querySelectorAll('[data-postcall]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      currentId = b.dataset.id;
+      closeAllDropdowns();
+      handlePostCall(b.dataset.postcall);
+    })
+  );
 }
 
 // ─── CARDS (mobile) ──────────────────────────────────────────────────
@@ -348,6 +356,14 @@ function renderCards() {
   wrap.querySelectorAll('[data-action]').forEach(b =>
     b.addEventListener('click', () => handleAction(b.dataset.id, b.dataset.action))
   );
+  wrap.querySelectorAll('[data-postcall]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      currentId = b.dataset.id;
+      closeAllDropdowns();
+      handlePostCall(b.dataset.postcall);
+    })
+  );
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────
@@ -370,11 +386,20 @@ function badgeStatus(s) {
 
 function btnAcao(l) {
   if (l.status === 'aguardando')
-    return `<button class="btn-acao agendar"  data-id="${l.id}" data-action="agendar">Agendar</button>`;
+    return `<button class="btn-acao agendar" data-id="${l.id}" data-action="agendar">Agendar</button>`;
   if (l.status === 'agendado')
-    return `<button class="btn-acao realizar" data-id="${l.id}" data-action="realizar">Marcar Realizada</button>`;
+    return `
+      <div class="realize-wrap" data-leadid="${l.id}">
+        <button class="btn-acao realizar" data-id="${l.id}" data-action="realizar">Marcar Realizada</button>
+        <div class="realize-dropdown">
+          <button class="realize-opt opt-realizada" data-id="${l.id}" data-postcall="realizada">✅ Call Realizada</button>
+          <button class="realize-opt opt-noshow"    data-id="${l.id}" data-postcall="noshow">❌ No Show</button>
+          <button class="realize-opt opt-remarcar"  data-id="${l.id}" data-postcall="remarcar">🔄 Remarcar</button>
+          <button class="realize-opt opt-cancelado" data-id="${l.id}" data-postcall="cancelado">🚫 Cancelado</button>
+        </div>
+      </div>`;
   if (l.status === 'noshow')
-    return `<button class="btn-acao agendar"  data-id="${l.id}" data-action="agendar">Remarcar</button>`;
+    return `<button class="btn-acao agendar" data-id="${l.id}" data-action="agendar">Remarcar</button>`;
   return `<button class="btn-acao ver" data-id="${l.id}" data-action="ver">Ver detalhes</button>`;
 }
 
@@ -432,8 +457,8 @@ function handleAction(id, action) {
   const lead = allLeads.find(l => l.id === id);
   if (!lead) return;
 
-  if (action === 'agendar')  openAgendar(lead);
-  else if (action === 'realizar') openRealizar(lead);
+  if (action === 'agendar')       openAgendar(lead);
+  else if (action === 'realizar') toggleRealizeDropdown(id);
   else verDetalhes(lead);
 }
 
@@ -451,30 +476,12 @@ function openAgendar(lead) {
     { l:'Chegou em',v: fmtDate(lead.datachegada) },
   ]);
 
-  $('form-agendar').style.display   = 'block';
-  $('form-realizada').style.display = 'none';
+  $('form-agendar').style.display = 'block';
 
   schedGoToStep(1);
   openModal();
 }
 
-function openRealizar(lead) {
-  modalMode = 'realizar';
-  $('modal-title').textContent    = 'O que aconteceu?';
-  $('modal-subtitle').textContent = `${lead.nome} · ${lead.celular}`;
-
-  $('lead-strip').innerHTML = strip([
-    { l:'Data prevista', v: lead.dataagendamento ? fmtDate(lead.dataagendamento) : '—' },
-    { l:'Horário',       v: lead.horaagendamento || '—' },
-    { l:'Closer',        v: lead.closer ? (CLOSERS[lead.closer]?.name || lead.closer) : '—' },
-  ]);
-
-  $('form-agendar').style.display   = 'none';
-  $('form-realizada').style.display = 'block';
-  $('btn-confirmar').style.display  = 'none';
-
-  openModal();
-}
 
 function verDetalhes(lead) {
   const statusLbl = {
@@ -504,6 +511,21 @@ function closeModal() {
   currentId = null;
   cal = { step: 1, closer: null, leadSnap: null };
   $('btn-voltar').style.display = 'none';
+}
+
+// ─── REALIZE DROPDOWN ────────────────────────────────────────────────
+function closeAllDropdowns() {
+  document.querySelectorAll('.realize-dropdown.open')
+    .forEach(d => d.classList.remove('open'));
+}
+
+function toggleRealizeDropdown(id) {
+  const wrap = document.querySelector(`.realize-wrap[data-leadid="${id}"]`);
+  if (!wrap) return;
+  const dropdown = wrap.querySelector('.realize-dropdown');
+  const isOpen   = dropdown.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) dropdown.classList.add('open');
 }
 
 // ─── PÓS-CALL ────────────────────────────────────────────────────────
@@ -647,10 +669,9 @@ function bindEvents() {
     if (e.target === $('modal-backdrop')) closeModal();
   });
 
-  // pós-call: seleção de opção (delegação)
-  $('form-realizada').addEventListener('click', e => {
-    const card = e.target.closest('.postcall-card');
-    if (card) handlePostCall(card.dataset.action);
+  // fecha dropdown ao clicar fora
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.realize-wrap')) closeAllDropdowns();
   });
 
   // agendamento: voltar ao passo 1
