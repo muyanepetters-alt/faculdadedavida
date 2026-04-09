@@ -872,3 +872,37 @@ textarea.form-ctrl { resize: vertical; min-height: 80px; }
 .toggle-opt.temp-frio.selected   { border-color: #4db5c8; background: rgba(77,181,200,.12); color: #4db5c8; }
 .toggle-opt.temp-morno.selected  { border-color: #CE9221; background: var(--gold-alpha);     color: var(--gold); }
 .toggle-opt.temp-quente.selected { border-color: #E05C4A; background: rgba(224,92,74,.12);  color: #E05C4A; }
+
+/* ══════════════════════════════════════════════════════════
+   DETALHES DO LEAD — seção somente leitura
+   ══════════════════════════════════════════════════════════ */
+
+.detalhes-section-title {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-top: 22px; margin-bottom: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.detalhes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+
+.detalhes-item {
+  display: flex; flex-direction: column; gap: 3px;
+}
+
+.detalhes-lbl {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-dim);
+}
+
+.detalhes-val {
+  font-size: 14px; font-weight: 500; color: var(--text);
+  word-break: break-word;
+}

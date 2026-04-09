@@ -485,10 +485,78 @@ function openAgendar(lead) {
 
 
 function verDetalhes(lead) {
-  const statusLbl = {
-    realizada: 'Call realizada', noshow: 'No Show', cancelado: 'Cancelado'
-  };
+  if (lead.status === 'realizada') {
+    openDetalhes(lead);
+    return;
+  }
+  const statusLbl = { noshow: 'No Show', cancelado: 'Cancelado' };
   toast(`${lead.nome} — ${statusLbl[lead.status] || lead.status}`, 'ok');
+}
+
+function openDetalhes(lead) {
+  modalMode = 'detalhes';
+
+  $('modal-title').textContent    = 'Detalhes da Call';
+  $('modal-subtitle').textContent = `${lead.nome} · ${lead.celular}`;
+  $('lead-strip').innerHTML = '';
+
+  // Seção 1 — Resultado (pré-preenchido)
+  $('form-agendar').style.display   = 'none';
+  $('form-resultado').style.display = 'block';
+
+  document.querySelectorAll('#form-resultado .toggle-opt').forEach(b => b.classList.remove('selected'));
+
+  const vendaStr = lead.venda_realizada === true ? 'sim' : lead.venda_realizada === false ? 'nao' : null;
+  if (vendaStr) setToggleVal('toggle-venda', vendaStr);
+
+  const temVenda = lead.venda_realizada === true;
+  $('campos-venda').style.display = temVenda ? 'block' : 'none';
+  $('res-valor-venda').value       = temVenda ? (lead.valor_venda   || '') : '';
+  $('res-valor-entrada').value     = temVenda ? (lead.valor_entrada || '') : '';
+  if (temVenda && lead.forma_pagamento) setToggleVal('toggle-pagamento', lead.forma_pagamento);
+
+  if (lead.status_closer) setToggleVal('toggle-closer-status', lead.status_closer);
+  if (lead.temperatura)   setToggleVal('toggle-temperatura',   lead.temperatura);
+  $('res-obs').value = lead.obs_call || '';
+
+  // Seção 2 — Dados do lead (somente leitura)
+  $('det-nome').textContent      = lead.nome      || '—';
+  $('det-celular').textContent   = lead.celular   || '—';
+  $('det-email').textContent     = lead.email     || '—';
+  $('det-origem').textContent    = lead.origem    || '—';
+  $('det-profissao').textContent = lead.profissao || '—';
+  $('det-renda').textContent     = lead.renda     || '—';
+  $('det-closer').textContent    = lead.closer ? (CLOSERS[lead.closer]?.name || lead.closer) : '—';
+
+  let dataCall = '—';
+  if (lead.realizadaem) {
+    dataCall = new Date(lead.realizadaem).toLocaleString('pt-BR', {
+      day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+  } else if (lead.dataagendamento) {
+    dataCall = `${fmtDate(lead.dataagendamento)} ${lead.horaagendamento || ''}`.trim();
+  }
+  $('det-data-call').textContent = dataCall;
+  $('form-detalhes').style.display = 'block';
+
+  // Footer
+  $('btn-voltar').style.display = 'none';
+  const btn = $('btn-confirmar');
+  btn.textContent      = 'Salvar Resultado';
+  btn.style.display    = '';
+  btn.style.background = 'var(--green-bright)';
+  btn.style.color      = '#0d1a1c';
+  btn.style.border     = 'none';
+  btn.disabled         = false;
+
+  openModal();
+}
+
+function setToggleVal(groupId, val) {
+  const btn = document.querySelector(`#${groupId} .toggle-opt[data-val="${val}"]`);
+  if (!btn) return;
+  document.querySelectorAll(`#${groupId} .toggle-opt`).forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
 }
 
 function strip(items) {
@@ -512,8 +580,9 @@ function closeModal() {
   currentId = null;
   modalMode = 'agendar';
   cal = { step: 1, closer: null, leadSnap: null };
-  $('btn-voltar').style.display   = 'none';
+  $('btn-voltar').style.display     = 'none';
   $('form-resultado').style.display = 'none';
+  $('form-detalhes').style.display  = 'none';
   $('form-agendar').style.display   = 'block';
   const btn = $('btn-confirmar');
   btn.style.display    = '';
@@ -714,6 +783,42 @@ async function confirmar() {
       const lead = allLeads.find(l => l.id === currentId);
       await saveLead(currentId, payload);
       toast(`Call registrada — ${lead ? lead.nome : ''}`, 'ok');
+
+    } else if (modalMode === 'detalhes') {
+      const vendaVal    = getToggleVal('toggle-venda');
+      const closerSt    = getToggleVal('toggle-closer-status');
+      const temperatura = getToggleVal('toggle-temperatura');
+
+      if (!vendaVal) {
+        toast('Informe se a venda foi realizada.', 'err');
+        btn.disabled = false;
+        return;
+      }
+      if (!closerSt) {
+        toast('Selecione o status do closer.', 'err');
+        btn.disabled = false;
+        return;
+      }
+
+      const payload = {
+        venda_realizada: vendaVal === 'sim',
+        status_closer:   closerSt,
+        obs_call:        $('res-obs').value.trim(),
+        atualizadoem:    new Date().toISOString()
+      };
+
+      if (temperatura) payload.temperatura = temperatura;
+
+      if (vendaVal === 'sim') {
+        const pagamento = getToggleVal('toggle-pagamento');
+        payload.valor_venda   = $('res-valor-venda').value.trim();
+        payload.valor_entrada = $('res-valor-entrada').value.trim();
+        if (pagamento) payload.forma_pagamento = pagamento;
+      }
+
+      const lead = allLeads.find(l => l.id === currentId);
+      await saveLead(currentId, payload);
+      toast(`Resultado atualizado — ${lead ? lead.nome : ''}`, 'ok');
 
     }
 
