@@ -175,79 +175,45 @@
       <!-- Lead summary strip -->
       <div class="lead-strip" id="lead-strip"></div>
 
-      <!-- Form: Agendar (calendar wizard) -->
+      <!-- Form: Agendar -->
       <div id="form-agendar">
 
-        <!-- Stepper -->
-        <div class="cal-stepper" id="cal-stepper">
-          <div class="cal-step active" data-step="1">
-            <span class="step-circle">1</span>
-            <span class="step-lbl">Closer</span>
-          </div>
-          <div class="step-line"></div>
-          <div class="cal-step" data-step="2">
-            <span class="step-circle">2</span>
-            <span class="step-lbl">Horário</span>
-          </div>
-          <div class="step-line"></div>
-          <div class="cal-step" data-step="3">
-            <span class="step-circle">3</span>
-            <span class="step-lbl">Confirmar</span>
-          </div>
-        </div>
-
-        <!-- Step 1 — Select Closer -->
-        <div class="cal-panel" id="cal-step-1">
-          <p class="cal-panel-hint">Selecione o closer responsável por esta call</p>
+        <!-- Passo 1 — Escolher closer -->
+        <div class="sched-panel" id="sched-step-1">
+          <p class="sched-hint">Selecione o closer — o link de agendamento abre em nova aba.</p>
           <div class="closer-grid">
-            <button class="closer-card" id="closer-card-fernanda" data-closer="fernanda">
-              <div class="closer-avatar" id="closer-avatar-fernanda">F</div>
+            <button class="closer-card" data-closer="fernanda">
+              <div class="closer-avatar" style="color:#CE9221;background:rgba(206,146,33,.12);border-color:#CE9221">F</div>
               <div class="closer-name">Fernanda</div>
-              <div class="closer-auth" id="closer-auth-fernanda">
-                <span class="auth-dot"></span><span class="auth-lbl">verificando…</span>
-              </div>
+              <div class="closer-cal-hint">Abre link de agendamento →</div>
             </button>
-            <button class="closer-card" id="closer-card-thomaz" data-closer="thomaz">
-              <div class="closer-avatar" id="closer-avatar-thomaz">T</div>
+            <button class="closer-card" data-closer="thomaz">
+              <div class="closer-avatar" style="color:#4db5c8;background:rgba(77,181,200,.12);border-color:#4db5c8">T</div>
               <div class="closer-name">Thomaz</div>
-              <div class="closer-auth" id="closer-auth-thomaz">
-                <span class="auth-dot"></span><span class="auth-lbl">verificando…</span>
-              </div>
+              <div class="closer-cal-hint">Abre link de agendamento →</div>
             </button>
           </div>
         </div>
 
-        <!-- Step 2 — Available slots -->
-        <div class="cal-panel" id="cal-step-2" style="display:none">
-          <div class="slots-meta">
-            <span class="slots-closer-tag" id="slots-closer-tag"></span>
-            <span class="slots-window">próximos 7 dias úteis</span>
+        <!-- Passo 2 — Confirmar dados -->
+        <div class="sched-panel" id="sched-step-2" style="display:none">
+          <div class="sched-banner">
+            <span class="sched-banner-ico">📅</span>
+            <p>Link aberto em nova aba. Confirme o horário com o lead e preencha os dados abaixo.</p>
           </div>
-
-          <div class="cal-state-layer" id="slots-loading">
-            <div class="spinner"></div>
-            <span id="slots-loading-msg">Buscando horários…</span>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="sched-closer-lbl">Closer</label>
+              <input type="text" id="sched-closer-lbl" class="form-ctrl" readonly>
+            </div>
+            <div class="form-group">
+              <label for="sched-datetime">Data e hora</label>
+              <input type="datetime-local" id="sched-datetime" class="form-ctrl" required>
+            </div>
           </div>
-
-          <div class="cal-state-layer cal-error" id="slots-error" style="display:none">
-            <span class="cal-error-ico">⚠</span>
-            <p id="slots-error-msg"></p>
-            <button class="btn-ghost btn-sm" id="btn-reconnect">Reconectar Google</button>
-          </div>
-
-          <div class="slots-grid" id="slots-grid" style="display:none"></div>
-
-          <p class="slots-none" id="slots-none" style="display:none">
-            Nenhum horário disponível nos próximos 7 dias para este closer.
-          </p>
-        </div>
-
-        <!-- Step 3 — Confirm -->
-        <div class="cal-panel" id="cal-step-3" style="display:none">
-          <div class="confirm-card" id="confirm-card"></div>
-          <div class="form-group" style="margin-top:16px">
-            <label for="cal-obs">Observações</label>
-            <textarea id="cal-obs" class="form-ctrl" rows="3"
+          <div class="form-group" style="margin-top:14px">
+            <label for="sched-obs">Observações</label>
+            <textarea id="sched-obs" class="form-ctrl" rows="3"
               placeholder="Contexto, interesse demonstrado, pontos de atenção…"></textarea>
           </div>
         </div>
@@ -286,7 +252,6 @@
 <!-- ===== TOASTS ===== -->
 <div class="toast-dock" id="toast-dock"></div>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

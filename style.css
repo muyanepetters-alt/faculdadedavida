@@ -699,4 +699,75 @@ textarea.form-ctrl { resize: vertical; min-height: 80px; }
 
   .toast-dock { bottom: 16px; right: 16px; left: 16px; }
   .toast { min-width: unset; width: 100%; }
+
+  /* agendamento mobile */
+  .closer-grid  { flex-direction: column; }
+  .form-row-2   { grid-template-columns: 1fr; }
 }
+
+/* ===========================================
+   MODAL DE AGENDAMENTO
+   =========================================== */
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.sched-panel { animation: fadeIn .18s ease; }
+
+.sched-hint {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 20px; text-align: center;
+}
+
+/* --- Closer cards (passo 1) --- */
+.closer-grid {
+  display: flex; gap: 14px;
+}
+
+.closer-card {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 22px 16px; border-radius: var(--r-lg);
+  border: 2px solid var(--border); background: var(--bg);
+  cursor: pointer; transition: var(--trans);
+}
+.closer-card:hover {
+  border-color: var(--gold); background: var(--gold-alpha);
+  transform: translateY(-2px); box-shadow: 0 6px 20px rgba(206,146,33,.14);
+}
+
+.closer-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 900;
+  background: var(--bg-elevated); border: 2px solid var(--border);
+  transition: var(--trans);
+}
+.closer-card:hover .closer-avatar { border-color: currentColor; }
+
+.closer-name {
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
+
+.closer-cal-hint {
+  font-size: 11px; color: var(--text-dim); letter-spacing: .2px;
+}
+
+/* --- Banner informativo (passo 2) --- */
+.sched-banner {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 14px 16px; margin-bottom: 18px;
+}
+
+.sched-banner-ico { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+.sched-banner p {
+  font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0;
+}
+
+/* --- Form 2 colunas --- */
+.form-row-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+
+/* --- Back button --- */
+.btn-back { margin-right: auto; }
+.modal-footer .btn-back { margin-right: auto; }

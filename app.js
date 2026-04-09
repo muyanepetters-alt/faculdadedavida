@@ -32,6 +32,11 @@ import {
   doc, updateDoc, addDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
+const CLOSERS = {
+  fernanda: { name: 'Fernanda', color: '#CE9221', bg: 'rgba(206,146,33,.12)', calLink: 'https://calendar.app.google/hWWi6tVKAhoXg5cUA' },
+  thomaz:   { name: 'Thomaz',   color: '#4db5c8', bg: 'rgba(77,181,200,.12)',  calLink: 'https://calendar.app.google/1heVe3395Tsk9GeM8' }
+};
+
 // ─── FIREBASE CONFIG ────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey:            'AIzaSyBdcF3cXNmfspkHJfd6MduhVl9s9lU9mDk',
@@ -63,6 +68,13 @@ let currentId     = null;
 let modalMode     = 'agendar'; // 'agendar' | 'realizar'
 let db            = null;
 let isLive        = false;
+
+// agendamento state
+let cal = {
+  step:     1,     // 1 | 2
+  closer:   null,  // 'fernanda' | 'thomaz'
+  leadSnap: null
+};
 
 // ─── INIT FIREBASE ───────────────────────────────────────────────────
 function initFirebase() {
@@ -422,6 +434,8 @@ function handleAction(id, action) {
 
 function openAgendar(lead) {
   modalMode = 'agendar';
+  cal = { step: 1, closer: null, leadSnap: lead };
+
   $('modal-title').textContent    = 'Agendar Call';
   $('modal-subtitle').textContent = `${lead.nome} · ${lead.celular}`;
 
@@ -432,19 +446,10 @@ function openAgendar(lead) {
     { l:'Chegou em',v: fmtDate(lead.datachegada) },
   ]);
 
-  $('form-agendar').style.display  = 'block';
+  $('form-agendar').style.display   = 'block';
   $('form-realizada').style.display = 'none';
 
-  const confirm = $('btn-confirmar');
-  confirm.textContent = 'Confirmar Agendamento';
-  confirm.style.cssText = 'background:var(--gold);color:#0d1a1c';
-
-  // default: tomorrow at 10h
-  const t = new Date(); t.setDate(t.getDate() + 1);
-  $('input-data').value = t.toISOString().slice(0, 10);
-  $('input-hora').value = '10:00';
-  $('input-obs').value  = '';
-
+  schedGoToStep(1);
   openModal();
 }
 
@@ -502,42 +507,74 @@ function closeModal() {
   $('modal-backdrop').classList.remove('open');
   document.body.style.overflow = '';
   currentId = null;
+  cal = { step: 1, closer: null, leadSnap: null };
+  $('btn-voltar').style.display = 'none';
+}
+
+// ─── AGENDAMENTO ─────────────────────────────────────────────────────
+
+function schedGoToStep(n) {
+  cal.step = n;
+  $('sched-step-1').style.display = n === 1 ? 'block' : 'none';
+  $('sched-step-2').style.display = n === 2 ? 'block' : 'none';
+  $('btn-voltar').style.display   = n === 2 ? 'inline-flex' : 'none';
+
+  const btn = $('btn-confirmar');
+  if (n === 1) {
+    btn.style.display = 'none';
+  } else {
+    btn.textContent        = 'Confirmar Agendamento';
+    btn.style.display      = '';
+    btn.style.background   = 'var(--gold)';
+    btn.style.color        = '#0d1a1c';
+    btn.style.border       = 'none';
+    btn.disabled           = false;
+  }
+}
+
+function schedSelectCloser(closer) {
+  cal.closer = closer;
+  window.open(CLOSERS[closer].calLink, '_blank', 'noopener,noreferrer');
+  $('sched-closer-lbl').value = CLOSERS[closer].name;
+  $('sched-datetime').value   = '';
+  $('sched-obs').value        = '';
+  schedGoToStep(2);
 }
 
 // ─── CONFIRM ─────────────────────────────────────────────────────────
 async function confirmar() {
   if (!currentId) return;
+
   const btn = $('btn-confirmar');
   btn.disabled = true;
 
   try {
     if (modalMode === 'agendar') {
-      const data = $('input-data').value;
-      const hora = $('input-hora').value;
-      const obs  = $('input-obs').value.trim();
-
-      if (!data || !hora) {
-        toast('Preencha a data e o horário.', 'err');
+      const dtVal = $('sched-datetime').value; // "YYYY-MM-DDTHH:MM"
+      if (!dtVal) {
+        toast('Preencha a data e hora da call.', 'err');
         btn.disabled = false;
         return;
       }
+      const [datePart, timePart] = dtVal.split('T');
+      const obs = $('sched-obs').value.trim();
 
       await saveLead(currentId, {
-        status: 'agendado',
-        dataagendamento: data,
-        horaagendamento: hora,
-        observacoes: obs,
-        atualizadoem: new Date().toISOString()
+        status:          'agendado',
+        closer:          cal.closer,
+        dataagendamento: datePart,
+        horaagendamento: timePart,
+        observacoes:     obs,
+        atualizadoem:    new Date().toISOString()
       });
-      toast(`Call agendada para ${fmtDate(data)} às ${hora}`, 'ok');
+
+      toast(`Call agendada com ${CLOSERS[cal.closer].name} — ${timePart} · ${fmtDate(datePart)}`, 'ok');
 
     } else {
       const resultado = $('input-resultado').value;
       const obs       = $('input-obs-call').value.trim();
-
       await saveLead(currentId, {
-        status: 'realizada',
-        resultado,
+        status: 'realizada', resultado,
         observacoes_call: obs,
         realizadaem: new Date().toISOString()
       });
@@ -548,7 +585,7 @@ async function confirmar() {
 
   } catch (e) {
     console.error(e);
-    toast('Erro ao salvar. Tente novamente.', 'err');
+    toast(e.message || 'Erro ao confirmar. Tente novamente.', 'err');
     btn.disabled = false;
   }
 }
@@ -598,9 +635,18 @@ function bindEvents() {
     if (e.target === $('modal-backdrop')) closeModal();
   });
 
+  // agendamento: voltar ao passo 1
+  $('btn-voltar').addEventListener('click', () => schedGoToStep(1));
+
+  // agendamento: seleção de closer (delegação)
+  $('sched-step-1').addEventListener('click', e => {
+    const card = e.target.closest('.closer-card');
+    if (card) schedSelectCloser(card.dataset.closer);
+  });
+
   // new lead (placeholder)
   $('btn-novo-lead').addEventListener('click', () =>
-    toast('Tela de cadastro em breve! 🚀', 'ok')
+    toast('Tela de cadastro em breve!', 'ok')
   );
 
   // keyboard
