@@ -161,7 +161,7 @@
 
 <!-- ===== MODAL AGENDAR / REALIZAR ===== -->
 <div class="modal-backdrop" id="modal-backdrop">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal-agendar-inner" role="dialog" aria-modal="true" aria-labelledby="modal-title">
 
     <div class="modal-header">
       <div>
@@ -175,23 +175,83 @@
       <!-- Lead summary strip -->
       <div class="lead-strip" id="lead-strip"></div>
 
-      <!-- Form: Agendar -->
+      <!-- Form: Agendar (calendar wizard) -->
       <div id="form-agendar">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="input-data">Data da Call <span class="req">*</span></label>
-            <input type="date" id="input-data" class="form-ctrl" required>
+
+        <!-- Stepper -->
+        <div class="cal-stepper" id="cal-stepper">
+          <div class="cal-step active" data-step="1">
+            <span class="step-circle">1</span>
+            <span class="step-lbl">Closer</span>
           </div>
-          <div class="form-group">
-            <label for="input-hora">Horário <span class="req">*</span></label>
-            <input type="time" id="input-hora" class="form-ctrl" required>
+          <div class="step-line"></div>
+          <div class="cal-step" data-step="2">
+            <span class="step-circle">2</span>
+            <span class="step-lbl">Horário</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="cal-step" data-step="3">
+            <span class="step-circle">3</span>
+            <span class="step-lbl">Confirmar</span>
           </div>
         </div>
-        <div class="form-group">
-          <label for="input-obs">Observações</label>
-          <textarea id="input-obs" class="form-ctrl" rows="3"
-            placeholder="Contexto, interesse demonstrado, pontos de atenção…"></textarea>
+
+        <!-- Step 1 — Select Closer -->
+        <div class="cal-panel" id="cal-step-1">
+          <p class="cal-panel-hint">Selecione o closer responsável por esta call</p>
+          <div class="closer-grid">
+            <button class="closer-card" id="closer-card-fernanda" data-closer="fernanda">
+              <div class="closer-avatar" id="closer-avatar-fernanda">F</div>
+              <div class="closer-name">Fernanda</div>
+              <div class="closer-auth" id="closer-auth-fernanda">
+                <span class="auth-dot"></span><span class="auth-lbl">verificando…</span>
+              </div>
+            </button>
+            <button class="closer-card" id="closer-card-thomaz" data-closer="thomaz">
+              <div class="closer-avatar" id="closer-avatar-thomaz">T</div>
+              <div class="closer-name">Thomaz</div>
+              <div class="closer-auth" id="closer-auth-thomaz">
+                <span class="auth-dot"></span><span class="auth-lbl">verificando…</span>
+              </div>
+            </button>
+          </div>
         </div>
+
+        <!-- Step 2 — Available slots -->
+        <div class="cal-panel" id="cal-step-2" style="display:none">
+          <div class="slots-meta">
+            <span class="slots-closer-tag" id="slots-closer-tag"></span>
+            <span class="slots-window">próximos 7 dias úteis</span>
+          </div>
+
+          <div class="cal-state-layer" id="slots-loading">
+            <div class="spinner"></div>
+            <span id="slots-loading-msg">Buscando horários…</span>
+          </div>
+
+          <div class="cal-state-layer cal-error" id="slots-error" style="display:none">
+            <span class="cal-error-ico">⚠</span>
+            <p id="slots-error-msg"></p>
+            <button class="btn-ghost btn-sm" id="btn-reconnect">Reconectar Google</button>
+          </div>
+
+          <div class="slots-grid" id="slots-grid" style="display:none"></div>
+
+          <p class="slots-none" id="slots-none" style="display:none">
+            Nenhum horário disponível nos próximos 7 dias para este closer.
+          </p>
+        </div>
+
+        <!-- Step 3 — Confirm -->
+        <div class="cal-panel" id="cal-step-3" style="display:none">
+          <div class="confirm-card" id="confirm-card"></div>
+          <div class="form-group" style="margin-top:16px">
+            <label for="cal-obs">Observações</label>
+            <textarea id="cal-obs" class="form-ctrl" rows="3"
+              placeholder="Contexto, interesse demonstrado, pontos de atenção…"></textarea>
+          </div>
+        </div>
+
       </div>
 
       <!-- Form: Marcar Realizada -->
@@ -216,6 +276,7 @@
 
     <div class="modal-footer">
       <button class="btn-ghost" id="btn-cancelar">Cancelar</button>
+      <button class="btn-ghost btn-back" id="btn-voltar" style="display:none">← Voltar</button>
       <button class="btn-confirm" id="btn-confirmar">Confirmar</button>
     </div>
 
@@ -225,6 +286,7 @@
 <!-- ===== TOASTS ===== -->
 <div class="toast-dock" id="toast-dock"></div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
