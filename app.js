@@ -509,8 +509,15 @@ function closeModal() {
   $('modal-backdrop').classList.remove('open');
   document.body.style.overflow = '';
   currentId = null;
+  modalMode = 'agendar';
   cal = { step: 1, closer: null, leadSnap: null };
-  $('btn-voltar').style.display = 'none';
+  $('btn-voltar').style.display   = 'none';
+  $('form-resultado').style.display = 'none';
+  $('form-agendar').style.display   = 'block';
+  const btn = $('btn-confirmar');
+  btn.style.background = '';
+  btn.style.color      = '';
+  btn.style.border     = '';
 }
 
 // ─── REALIZE DROPDOWN ────────────────────────────────────────────────
@@ -538,8 +545,12 @@ async function handlePostCall(action) {
     return;
   }
 
+  if (action === 'realizada') {
+    openResultado(lead);
+    return;
+  }
+
   const toastMsg = {
-    realizada: `Call realizada — ${lead.nome}`,
     noshow:    `No Show registrado — ${lead.nome}`,
     cancelado: `Cancelamento registrado — ${lead.nome}`
   };
@@ -552,6 +563,56 @@ async function handlePostCall(action) {
     console.error(e);
     toast('Erro ao salvar. Tente novamente.', 'err');
   }
+}
+
+// ─── RESULTADO DE CALL ───────────────────────────────────────────────
+function openResultado(lead) {
+  modalMode = 'resultado';
+
+  $('modal-title').textContent    = 'Resultado da Call';
+  $('modal-subtitle').textContent = `${lead.nome} · ${lead.celular}`;
+
+  $('lead-strip').innerHTML = strip([
+    { l:'Origem',    v: lead.origem    || '—' },
+    { l:'Profissão', v: lead.profissao || '—' },
+    { l:'Renda',     v: lead.renda     || '—' },
+    { l:'Agendado',  v: lead.dataagendamento ? `${fmtDate(lead.dataagendamento)} ${lead.horaagendamento || ''}`.trim() : '—' },
+  ]);
+
+  // reset form
+  $('form-agendar').style.display  = 'none';
+  $('form-resultado').style.display = 'block';
+  $('campos-venda').style.display  = 'none';
+
+  // reset toggles
+  document.querySelectorAll('#form-resultado .toggle-opt').forEach(b => b.classList.remove('selected'));
+
+  // reset textareas / inputs
+  $('res-obs').value          = '';
+  $('res-valor-venda').value  = '';
+  $('res-valor-entrada').value = '';
+
+  // configure footer
+  $('btn-voltar').style.display = 'none';
+  const btn = $('btn-confirmar');
+  btn.textContent      = 'Salvar Resultado';
+  btn.style.display    = '';
+  btn.style.background = 'var(--green-bright)';
+  btn.style.color      = '#0d1a1c';
+  btn.style.border     = 'none';
+  btn.disabled         = false;
+
+  openModal();
+}
+
+function toggleSelect(groupId, clickedBtn) {
+  document.querySelectorAll(`#${groupId} .toggle-opt`).forEach(b => b.classList.remove('selected'));
+  clickedBtn.classList.add('selected');
+}
+
+function getToggleVal(groupId) {
+  const sel = document.querySelector(`#${groupId} .toggle-opt.selected`);
+  return sel ? sel.dataset.val : null;
 }
 
 // ─── AGENDAMENTO ─────────────────────────────────────────────────────
@@ -612,6 +673,44 @@ async function confirmar() {
       });
 
       toast(`Call agendada com ${CLOSERS[cal.closer].name} — ${timePart} · ${fmtDate(datePart)}`, 'ok');
+
+    } else if (modalMode === 'resultado') {
+      const vendaVal    = getToggleVal('toggle-venda');
+      const closerSt    = getToggleVal('toggle-closer-status');
+      const temperatura = getToggleVal('toggle-temperatura');
+
+      if (!vendaVal) {
+        toast('Informe se a venda foi realizada.', 'err');
+        btn.disabled = false;
+        return;
+      }
+      if (!closerSt) {
+        toast('Selecione o status do closer.', 'err');
+        btn.disabled = false;
+        return;
+      }
+
+      const payload = {
+        status:         'realizada',
+        venda_realizada: vendaVal === 'sim',
+        status_closer:  closerSt,
+        obs_call:       $('res-obs').value.trim(),
+        realizadaem:    new Date().toISOString(),
+        atualizadoem:   new Date().toISOString()
+      };
+
+      if (temperatura) payload.temperatura = temperatura;
+
+      if (vendaVal === 'sim') {
+        const pagamento = getToggleVal('toggle-pagamento');
+        payload.valor_venda   = $('res-valor-venda').value.trim();
+        payload.valor_entrada = $('res-valor-entrada').value.trim();
+        if (pagamento) payload.forma_pagamento = pagamento;
+      }
+
+      const lead = allLeads.find(l => l.id === currentId);
+      await saveLead(currentId, payload);
+      toast(`Call registrada — ${lead ? lead.nome : ''}`, 'ok');
 
     }
 
@@ -681,6 +780,20 @@ function bindEvents() {
   $('sched-step-1').addEventListener('click', e => {
     const card = e.target.closest('.closer-card');
     if (card) schedSelectCloser(card.dataset.closer);
+  });
+
+  // resultado: toggles
+  $('form-resultado').addEventListener('click', e => {
+    const opt = e.target.closest('.toggle-opt');
+    if (!opt) return;
+    const group = opt.closest('.toggle-group');
+    if (!group) return;
+    toggleSelect(group.id, opt);
+
+    // mostrar/ocultar campos financeiros
+    if (group.id === 'toggle-venda') {
+      $('campos-venda').style.display = opt.dataset.val === 'sim' ? 'block' : 'none';
+    }
   });
 
   // new lead (placeholder)

@@ -821,3 +821,52 @@ textarea.form-ctrl { resize: vertical; min-height: 80px; }
 /* --- Back button --- */
 .btn-back { margin-right: auto; }
 .modal-footer .btn-back { margin-right: auto; }
+
+/* ══════════════════════════════════════════════════════════
+   RESULTADO DE CALL — toggle groups
+   ══════════════════════════════════════════════════════════ */
+
+.form-lbl {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: .4px;
+  margin-bottom: 8px;
+}
+
+.toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toggle-opt {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--trans);
+  white-space: nowrap;
+}
+
+.toggle-opt:hover {
+  border-color: var(--gold);
+  color: var(--text);
+  background: var(--gold-alpha);
+}
+
+.toggle-opt.selected {
+  border-color: var(--gold);
+  background: var(--gold-alpha);
+  color: var(--gold);
+}
+
+/* Temperatura — cores específicas quando selected */
+.toggle-opt.temp-frio.selected   { border-color: #4db5c8; background: rgba(77,181,200,.12); color: #4db5c8; }
+.toggle-opt.temp-morno.selected  { border-color: #CE9221; background: var(--gold-alpha);     color: var(--gold); }
+.toggle-opt.temp-quente.selected { border-color: #E05C4A; background: rgba(224,92,74,.12);  color: #E05C4A; }

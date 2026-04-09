@@ -177,6 +177,71 @@
       <!-- Lead summary strip -->
       <div class="lead-strip" id="lead-strip"></div>
 
+      <!-- Form: Resultado de Call -->
+      <div id="form-resultado" style="display:none">
+
+        <!-- Venda realizada? -->
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-lbl">Venda realizada?</label>
+          <div class="toggle-group" id="toggle-venda">
+            <button class="toggle-opt" data-val="sim">✅ Sim</button>
+            <button class="toggle-opt" data-val="nao">❌ Não</button>
+          </div>
+        </div>
+
+        <!-- Campos financeiros (só quando sim) -->
+        <div id="campos-venda" style="display:none">
+          <div class="form-row-2" style="margin-bottom:14px">
+            <div class="form-group">
+              <label for="res-valor-venda">Valor da venda</label>
+              <input type="text" id="res-valor-venda" class="form-ctrl" placeholder="R$ 0.000">
+            </div>
+            <div class="form-group">
+              <label for="res-valor-entrada">Valor de entrada</label>
+              <input type="text" id="res-valor-entrada" class="form-ctrl" placeholder="R$ 0.000">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:18px">
+            <label class="form-lbl">Forma de pagamento</label>
+            <div class="toggle-group" id="toggle-pagamento">
+              <button class="toggle-opt" data-val="avista">À vista</button>
+              <button class="toggle-opt" data-val="boleto">Boleto</button>
+              <button class="toggle-opt" data-val="cartao">Cartão</button>
+              <button class="toggle-opt" data-val="parcelado">Parcelado</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status do closer -->
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-lbl">Status do closer</label>
+          <div class="toggle-group" id="toggle-closer-status">
+            <button class="toggle-opt" data-val="followup">Follow Up</button>
+            <button class="toggle-opt" data-val="fechamento">Fechamento</button>
+            <button class="toggle-opt" data-val="venda_realizada">Venda Realizada</button>
+            <button class="toggle-opt" data-val="venda_perdida">Venda Perdida</button>
+          </div>
+        </div>
+
+        <!-- Temperatura -->
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-lbl">Temperatura do lead</label>
+          <div class="toggle-group" id="toggle-temperatura">
+            <button class="toggle-opt temp-frio"  data-val="frio">❄️ Frio</button>
+            <button class="toggle-opt temp-morno" data-val="morno">🌤️ Morno</button>
+            <button class="toggle-opt temp-quente" data-val="quente">🔥 Quente</button>
+          </div>
+        </div>
+
+        <!-- Observações -->
+        <div class="form-group">
+          <label for="res-obs">Observações da call</label>
+          <textarea id="res-obs" class="form-ctrl" rows="3"
+            placeholder="Como foi a call, objeções, próximos passos…"></textarea>
+        </div>
+
+      </div>
+
       <!-- Form: Agendar -->
       <div id="form-agendar">
 
