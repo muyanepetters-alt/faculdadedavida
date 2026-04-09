@@ -425,6 +425,16 @@ input, select, textarea { font-family: inherit; color: var(--text); }
   color: var(--green-bright);
   border: 1px solid rgba(76,175,142,.2);
 }
+.badge-status.noshow {
+  background: rgba(192,57,43,.1);
+  color: #E05C4A;
+  border: 1px solid rgba(192,57,43,.22);
+}
+.badge-status.cancelado {
+  background: rgba(107,39,55,.12);
+  color: #B05068;
+  border: 1px solid rgba(107,39,55,.25);
+}
 
 /* --- Action buttons --- */
 .btn-acao {
@@ -614,11 +624,6 @@ input, select, textarea { font-family: inherit; color: var(--text); }
 textarea.form-ctrl { resize: vertical; min-height: 80px; }
 .form-ctrl option { background: var(--bg-elevated); }
 
-.confirm-msg {
-  font-size: 14px; color: var(--text); line-height: 1.6;
-  margin-bottom: 18px;
-}
-.confirm-msg strong { color: var(--green-bright); }
 
 .modal-footer {
   display: flex; align-items: center; justify-content: flex-end;
@@ -766,6 +771,52 @@ textarea.form-ctrl { resize: vertical; min-height: 80px; }
 /* --- Form 2 colunas --- */
 .form-row-2 {
   display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+
+/* --- Post-call options --- */
+.postcall-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+.postcall-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 12px; border-radius: var(--r-lg);
+  border: 2px solid var(--border); background: var(--bg);
+  cursor: pointer; transition: var(--trans); text-align: center;
+}
+.postcall-card:hover { transform: translateY(-2px); }
+
+.postcall-ico   { font-size: 26px; line-height: 1; }
+.postcall-label { font-size: 14px; font-weight: 700; color: var(--text); }
+.postcall-sub   { font-size: 11px; color: var(--text-dim); }
+
+.postcall-card[data-action="realizada"] {
+  border-color: var(--green-bright); background: rgba(76,175,142,.07);
+}
+.postcall-card[data-action="realizada"]:hover {
+  background: rgba(76,175,142,.16);
+  box-shadow: 0 6px 20px rgba(76,175,142,.2);
+}
+.postcall-card[data-action="noshow"] {
+  border-color: #C0392B; background: rgba(192,57,43,.07);
+}
+.postcall-card[data-action="noshow"]:hover {
+  background: rgba(192,57,43,.16);
+  box-shadow: 0 6px 20px rgba(192,57,43,.2);
+}
+.postcall-card[data-action="remarcar"] {
+  border-color: #0A4751; background: rgba(10,71,81,.1);
+}
+.postcall-card[data-action="remarcar"]:hover {
+  background: rgba(10,71,81,.22);
+  box-shadow: 0 6px 20px rgba(10,71,81,.3);
+}
+.postcall-card[data-action="cancelado"] {
+  border-color: #6B2737; background: rgba(107,39,55,.07);
+}
+.postcall-card[data-action="cancelado"]:hover {
+  background: rgba(107,39,55,.16);
+  box-shadow: 0 6px 20px rgba(107,39,55,.2);
 }
 
 /* --- Back button --- */

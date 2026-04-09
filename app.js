@@ -361,15 +361,20 @@ function badgeOrigem(o) {
 }
 
 function badgeStatus(s) {
-  const labels = { aguardando: 'Aguardando', agendado: 'Agendado', realizada: 'Call Realizada' };
+  const labels = {
+    aguardando: 'Aguardando', agendado: 'Agendado',
+    realizada: 'Call Realizada', noshow: 'No Show', cancelado: 'Cancelado'
+  };
   return `<span class="badge-status ${s || ''}">${labels[s] || '—'}</span>`;
 }
 
 function btnAcao(l) {
   if (l.status === 'aguardando')
-    return `<button class="btn-acao agendar" data-id="${l.id}" data-action="agendar">Agendar</button>`;
+    return `<button class="btn-acao agendar"  data-id="${l.id}" data-action="agendar">Agendar</button>`;
   if (l.status === 'agendado')
     return `<button class="btn-acao realizar" data-id="${l.id}" data-action="realizar">Marcar Realizada</button>`;
+  if (l.status === 'noshow')
+    return `<button class="btn-acao agendar"  data-id="${l.id}" data-action="agendar">Remarcar</button>`;
   return `<button class="btn-acao ver" data-id="${l.id}" data-action="ver">Ver detalhes</button>`;
 }
 
@@ -455,37 +460,27 @@ function openAgendar(lead) {
 
 function openRealizar(lead) {
   modalMode = 'realizar';
-  $('modal-title').textContent    = 'Marcar Call Realizada';
+  $('modal-title').textContent    = 'O que aconteceu?';
   $('modal-subtitle').textContent = `${lead.nome} · ${lead.celular}`;
 
   $('lead-strip').innerHTML = strip([
-    { l:'Data da Call', v: lead.dataagendamento ? fmtDate(lead.dataagendamento) : '—' },
-    { l:'Horário',      v: lead.horaagendamento || '—' },
-    { l:'Profissão',    v: lead.profissao || '—' },
-    { l:'Renda',        v: lead.renda     || '—' },
+    { l:'Data prevista', v: lead.dataagendamento ? fmtDate(lead.dataagendamento) : '—' },
+    { l:'Horário',       v: lead.horaagendamento || '—' },
+    { l:'Closer',        v: lead.closer ? (CLOSERS[lead.closer]?.name || lead.closer) : '—' },
   ]);
 
-  $('form-agendar').style.display  = 'none';
+  $('form-agendar').style.display   = 'none';
   $('form-realizada').style.display = 'block';
-
-  const confirm = $('btn-confirmar');
-  confirm.textContent = 'Marcar como Realizada';
-  confirm.style.cssText = 'background:var(--green-bright);color:#fff';
-
-  $('input-resultado').value  = 'interessado';
-  $('input-obs-call').value   = '';
+  $('btn-confirmar').style.display  = 'none';
 
   openModal();
 }
 
 function verDetalhes(lead) {
-  const resultMap = {
-    interessado:     'Interessado — continua no funil',
-    nao_interessado: 'Não interessado',
-    reagendar:       'Precisa reagendar',
-    matriculado:     'Matriculado ✓'
+  const statusLbl = {
+    realizada: 'Call realizada', noshow: 'No Show', cancelado: 'Cancelado'
   };
-  toast(`${lead.nome} — ${resultMap[lead.resultado] || 'Call realizada'}`, 'ok');
+  toast(`${lead.nome} — ${statusLbl[lead.status] || lead.status}`, 'ok');
 }
 
 function strip(items) {
@@ -509,6 +504,32 @@ function closeModal() {
   currentId = null;
   cal = { step: 1, closer: null, leadSnap: null };
   $('btn-voltar').style.display = 'none';
+}
+
+// ─── PÓS-CALL ────────────────────────────────────────────────────────
+async function handlePostCall(action) {
+  const lead = allLeads.find(l => l.id === currentId);
+  if (!lead) return;
+
+  if (action === 'remarcar') {
+    openAgendar(lead);
+    return;
+  }
+
+  const toastMsg = {
+    realizada: `Call realizada — ${lead.nome}`,
+    noshow:    `No Show registrado — ${lead.nome}`,
+    cancelado: `Cancelamento registrado — ${lead.nome}`
+  };
+
+  try {
+    await saveLead(currentId, { status: action, atualizadoem: new Date().toISOString() });
+    toast(toastMsg[action] || 'Status atualizado.', 'ok');
+    closeModal();
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao salvar. Tente novamente.', 'err');
+  }
 }
 
 // ─── AGENDAMENTO ─────────────────────────────────────────────────────
@@ -570,15 +591,6 @@ async function confirmar() {
 
       toast(`Call agendada com ${CLOSERS[cal.closer].name} — ${timePart} · ${fmtDate(datePart)}`, 'ok');
 
-    } else {
-      const resultado = $('input-resultado').value;
-      const obs       = $('input-obs-call').value.trim();
-      await saveLead(currentId, {
-        status: 'realizada', resultado,
-        observacoes_call: obs,
-        realizadaem: new Date().toISOString()
-      });
-      toast('Call marcada como realizada!', 'ok');
     }
 
     closeModal();
@@ -633,6 +645,12 @@ function bindEvents() {
   $('btn-confirmar').addEventListener('click', confirmar);
   $('modal-backdrop').addEventListener('click', e => {
     if (e.target === $('modal-backdrop')) closeModal();
+  });
+
+  // pós-call: seleção de opção (delegação)
+  $('form-realizada').addEventListener('click', e => {
+    const card = e.target.closest('.postcall-card');
+    if (card) handlePostCall(card.dataset.action);
   });
 
   // agendamento: voltar ao passo 1
