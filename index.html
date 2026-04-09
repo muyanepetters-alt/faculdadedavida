@@ -103,7 +103,9 @@
           <option value="">Todos os status</option>
           <option value="aguardando">Aguardando agendamento</option>
           <option value="agendado">Agendado</option>
-          <option value="realizada">Call realizada</option>
+          <option value="realizada">Call Realizada</option>
+          <option value="noshow">No Show</option>
+          <option value="cancelado">Cancelado</option>
         </select>
       </div>
       <div class="filter-group">
@@ -220,22 +222,30 @@
 
       </div>
 
-      <!-- Form: Marcar Realizada -->
+      <!-- Form: O que aconteceu com a call? -->
       <div id="form-realizada" style="display:none">
-        <p class="confirm-msg">Deseja marcar esta call como <strong>realizada</strong>?</p>
-        <div class="form-group">
-          <label for="input-resultado">Resultado da Call</label>
-          <select id="input-resultado" class="form-ctrl">
-            <option value="interessado">Interessado — continua no funil</option>
-            <option value="nao_interessado">Não interessado</option>
-            <option value="reagendar">Precisa reagendar</option>
-            <option value="matriculado">Matriculado ✓</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-top:14px">
-          <label for="input-obs-call">Observações da Call</label>
-          <textarea id="input-obs-call" class="form-ctrl" rows="3"
-            placeholder="Resumo da conversa…"></textarea>
+        <p class="sched-hint">O que aconteceu com esta call?</p>
+        <div class="postcall-grid">
+          <button class="postcall-card" data-action="realizada">
+            <span class="postcall-ico">✅</span>
+            <span class="postcall-label">Call Realizada</span>
+            <span class="postcall-sub">Conversa aconteceu</span>
+          </button>
+          <button class="postcall-card" data-action="noshow">
+            <span class="postcall-ico">❌</span>
+            <span class="postcall-label">No Show</span>
+            <span class="postcall-sub">Lead não apareceu</span>
+          </button>
+          <button class="postcall-card" data-action="remarcar">
+            <span class="postcall-ico">🔄</span>
+            <span class="postcall-label">Remarcar</span>
+            <span class="postcall-sub">Agendar nova data</span>
+          </button>
+          <button class="postcall-card" data-action="cancelado">
+            <span class="postcall-ico">🚫</span>
+            <span class="postcall-label">Cancelado</span>
+            <span class="postcall-sub">Lead desistiu</span>
+          </button>
         </div>
       </div>
     </div>
