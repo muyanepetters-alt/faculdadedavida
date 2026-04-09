@@ -545,6 +545,8 @@ input, select, textarea { font-family: inherit; color: var(--text); }
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   width: 100%; max-width: 520px;
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
   box-shadow: var(--shad-lg);
   animation: modalIn .18s ease;
 }
@@ -574,7 +576,7 @@ input, select, textarea { font-family: inherit; color: var(--text); }
 }
 .modal-close:hover { color: var(--text); background: var(--bg-hover); }
 
-.modal-body { padding: 22px; }
+.modal-body { padding: 22px; flex: 1; overflow-y: auto; }
 
 /* Lead strip inside modal */
 .lead-strip {

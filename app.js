@@ -476,7 +476,8 @@ function openAgendar(lead) {
     { l:'Chegou em',v: fmtDate(lead.datachegada) },
   ]);
 
-  $('form-agendar').style.display = 'block';
+  $('form-resultado').style.display = 'none';
+  $('form-agendar').style.display   = 'block';
 
   schedGoToStep(1);
   openModal();
@@ -515,9 +516,11 @@ function closeModal() {
   $('form-resultado').style.display = 'none';
   $('form-agendar').style.display   = 'block';
   const btn = $('btn-confirmar');
+  btn.style.display    = '';
   btn.style.background = '';
   btn.style.color      = '';
   btn.style.border     = '';
+  btn.textContent      = 'Confirmar';
 }
 
 // ─── REALIZE DROPDOWN ────────────────────────────────────────────────
