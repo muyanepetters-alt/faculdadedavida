@@ -76,6 +76,7 @@ let perfilLeadId  = null;
 let novoLeadId    = null;
 let auth          = null;
 let leadsLoaded   = false;
+let activeTab     = 'leads';
 
 // agendamento state
 let cal = {
@@ -321,28 +322,43 @@ service cloud.firestore.rules {
   $('leads-cards').innerHTML = '';
 }
 
+// ─── TAB SWITCHING ───────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  const panel = $('tab-' + tab);
+  if (panel) panel.style.display = '';
+  document.querySelectorAll('.nav-link[data-tab]').forEach(l =>
+    l.classList.toggle('active', l.dataset.tab === tab)
+  );
+  if      (tab === 'leads')        { populateMonths(); applyFilters(); }
+  else if (tab === 'closer')       renderCloserTab();
+  else if (tab === 'agendamentos') renderAgendamentosTab();
+  // relatórios: static panel, nothing to render
+}
+
 // ─── RENDER PIPELINE ─────────────────────────────────────────────────
 function renderAll() {
-  // Ordena por datachegada decrescente no cliente (sem precisar de índice no Firestore)
   allLeads.sort((a, b) => (b.datachegada || '').localeCompare(a.datachegada || ''));
-  populateMonths();
-  applyFilters(); // chama updateStats internamente
+  updateStats(); // always keep stats fresh
+  if      (activeTab === 'leads')        { populateMonths(); applyFilters(); }
+  else if (activeTab === 'closer')       renderCloserTab();
+  else if (activeTab === 'agendamentos') renderAgendamentosTab();
 }
 
 function applyFilters() {
   const origem = $('filter-origem').value;
-  const status = $('filter-status').value;
   const mes    = $('filter-mes').value;
   const busca  = $('filter-busca').value.toLowerCase().trim();
-
+  // Leads tab always shows only aguardando
   filteredLeads = allLeads.filter(l => {
-    if (origem && l.origem  !== origem)         return false;
-    if (status && l.status  !== status)         return false;
-    if (mes    && !(l.datachegada || '').startsWith(mes)) return false;
+    if (l.status !== 'aguardando')                         return false;
+    if (origem && l.origem !== origem)                     return false;
+    if (mes    && !(l.datachegada || '').startsWith(mes))  return false;
     if (busca) {
       const n = (l.nome    || '').toLowerCase();
       const c = (l.celular || '').toLowerCase();
-      if (!n.includes(busca) && !c.includes(busca)) return false;
+      if (!n.includes(busca) && !c.includes(busca))        return false;
     }
     return true;
   });
@@ -351,6 +367,214 @@ function applyFilters() {
   renderCards();
   updateCount();
   updateStats();
+}
+
+// ─── CLOSER TAB ──────────────────────────────────────────────────────
+function renderCloserTab() {
+  const agendados = allLeads.filter(l => l.status === 'agendado');
+
+  ['fernanda', 'thomaz'].forEach(key => {
+    const list  = $(`closer-${key}-list`);
+    const count = $(`closer-${key}-count`);
+    const leads = agendados.filter(l => (l.closer || '').toLowerCase() === key)
+      .sort((a, b) =>
+        ((a.dataagendamento || '') + (a.horaagendamento || ''))
+          .localeCompare((b.dataagendamento || '') + (b.horaagendamento || ''))
+      );
+
+    count.textContent = `${leads.length} call${leads.length !== 1 ? 's' : ''} agendada${leads.length !== 1 ? 's' : ''}`;
+
+    if (!leads.length) {
+      list.innerHTML = '<p class="closer-empty-section">Nenhuma call agendada.</p>';
+      return;
+    }
+
+    list.innerHTML = leads.map(l => `
+      <div class="clc-card">
+        <div class="clc-head">
+          <button class="clc-nome" data-perfil="${l.id}">${esc(l.nome || '—')}</button>
+          <span class="clc-tempo">${fmtDateHora(l.dataagendamento, l.horaagendamento)}</span>
+        </div>
+        <div class="clc-meta">
+          ${badgeOrigem(l.origem)}
+          ${l.renda   ? `<span class="clc-renda">${esc(l.renda)}</span>`   : ''}
+          ${l.celular ? `<span class="clc-cel">${esc(l.celular)}</span>` : ''}
+        </div>
+        ${l.observacoes ? `<div class="clc-obs">${esc(l.observacoes)}</div>` : ''}
+        <div class="clc-foot">
+          <button class="btn-acao realizar btn-resultado-closer" data-id="${l.id}">
+            Resultado da Call →
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-perfil]').forEach(b =>
+      b.addEventListener('click', () => {
+        const lead = allLeads.find(l => l.id === b.dataset.perfil);
+        if (lead) openPerfil(lead);
+      })
+    );
+    list.querySelectorAll('.btn-resultado-closer').forEach(b =>
+      b.addEventListener('click', () => {
+        const lead = allLeads.find(l => l.id === b.dataset.id);
+        if (!lead) return;
+        currentId = lead.id;
+        openResultado(lead);
+      })
+    );
+  });
+}
+
+// ─── AGENDAMENTOS TAB ────────────────────────────────────────────────
+function renderAgendamentosTab() {
+  const today     = new Date().toISOString().slice(0, 10);
+  const todayLeads = allLeads.filter(l => l.status === 'agendado' && l.dataagendamento === today);
+  const content   = $('agenda-content');
+  const label     = $('agenda-data-label');
+
+  label.textContent = `${todayLeads.length} call${todayLeads.length !== 1 ? 's' : ''} para hoje — ${fmtDate(today)}`;
+
+  if (!todayLeads.length) {
+    content.innerHTML = `
+      <div class="agenda-empty">
+        <div class="empty-ico">📅</div>
+        <h3>Nenhuma call para hoje</h3>
+        <p>Sem calls agendadas para ${fmtDate(today)}.</p>
+      </div>`;
+    return;
+  }
+
+  // Group by closer, sort each group by time
+  const groups = {};
+  todayLeads.forEach(l => {
+    const k = l.closer || '_sem_closer';
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(l);
+  });
+  Object.values(groups).forEach(arr =>
+    arr.sort((a, b) => (a.horaagendamento || '').localeCompare(b.horaagendamento || ''))
+  );
+
+  const order = ['fernanda', 'thomaz',
+    ...Object.keys(groups).filter(k => k !== 'fernanda' && k !== 'thomaz')];
+
+  content.innerHTML = order
+    .filter(k => groups[k]?.length)
+    .map(key => {
+      const c      = CLOSERS[key];
+      const leads  = groups[key];
+      const name   = c ? c.name : (key === '_sem_closer' ? 'Sem closer' : key);
+      const color  = c ? c.color : 'var(--text-muted)';
+      const bg     = c ? c.bg   : 'var(--bg-elevated)';
+      const border = c ? c.color : 'var(--border)';
+      const init   = name[0].toUpperCase();
+      return `
+        <div class="agenda-group">
+          <div class="agenda-group-header">
+            <div class="agenda-avatar" style="color:${color};background:${bg};border:1.5px solid ${border}">${init}</div>
+            <h3 class="agenda-group-name">${esc(name)}</h3>
+            <span class="agenda-group-count">${leads.length} call${leads.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="agenda-cards">
+            ${leads.map(l => `
+              <div class="agenda-card">
+                <div class="agenda-card-time">${esc(l.horaagendamento || '—')}</div>
+                <div class="agenda-card-info">
+                  <button class="agenda-card-nome" data-perfil="${l.id}">${esc(l.nome || '—')}</button>
+                  <span class="agenda-card-sub">${[l.celular, l.origem, l.renda].filter(Boolean).map(esc).join(' · ')}</span>
+                </div>
+                <button class="btn-ghost btn-sm btn-briefing" data-id="${l.id}">Gerar Briefing</button>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
+  content.querySelectorAll('[data-perfil]').forEach(b =>
+    b.addEventListener('click', () => {
+      const lead = allLeads.find(l => l.id === b.dataset.perfil);
+      if (lead) openPerfil(lead);
+    })
+  );
+  content.querySelectorAll('.btn-briefing').forEach(b =>
+    b.addEventListener('click', () => {
+      const lead = allLeads.find(l => l.id === b.dataset.id);
+      if (lead) gerarBriefingLead(lead);
+    })
+  );
+}
+
+function gerarAgendaDoDia() {
+  const today     = new Date().toISOString().slice(0, 10);
+  const todayLeads = allLeads.filter(l => l.status === 'agendado' && l.dataagendamento === today);
+
+  if (!todayLeads.length) {
+    toast('Nenhuma call agendada para hoje.', 'err');
+    return;
+  }
+
+  const groups = {};
+  todayLeads.forEach(l => {
+    const k = l.closer || '_sem_closer';
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(l);
+  });
+  Object.values(groups).forEach(arr =>
+    arr.sort((a, b) => (a.horaagendamento || '').localeCompare(b.horaagendamento || ''))
+  );
+
+  const divider = '─'.repeat(36);
+  let text = `📅 AGENDA DO DIA — ${fmtDate(today)}\n${'═'.repeat(36)}\n\n`;
+
+  ['fernanda', 'thomaz', ...Object.keys(groups).filter(k => k !== 'fernanda' && k !== 'thomaz')]
+    .filter(k => groups[k])
+    .forEach(key => {
+      const name  = CLOSERS[key] ? CLOSERS[key].name : (key === '_sem_closer' ? 'Sem closer' : key);
+      text += `👤 ${name.toUpperCase()}\n${divider}\n`;
+      groups[key].forEach(l => {
+        text += `${l.horaagendamento || '--:--'} — ${l.nome || '—'} | ${l.celular || '—'}`;
+        if (l.origem) text += ` | ${l.origem}`;
+        if (l.renda)  text += ` | ${l.renda}`;
+        text += '\n';
+      });
+      text += '\n';
+    });
+
+  navigator.clipboard.writeText(text)
+    .then(() => toast('Agenda copiada para a área de transferência!', 'ok'))
+    .catch(() => toast('Não foi possível copiar. Verifique permissões do navegador.', 'err'));
+}
+
+function gerarBriefingLead(lead) {
+  const fields = [
+    ['Nome',              lead.nome],
+    ['Celular',           lead.celular],
+    ['E-mail',            lead.email],
+    ['Instagram',         lead.instagram],
+    ['Profissão',         lead.profissao],
+    ['Renda',             lead.renda],
+    ['Origem',            lead.origem],
+    ['Desafio',           lead.desafio],
+    ['Motivação',         lead.motivacao],
+    ['Já participou',     lead.jaParticipou],
+    ['Já é aluna',        lead.jaEAluna],
+    ['Tempo que conhece', lead.tempoConhece],
+    ['De onde conhece',   lead.deOnde],
+    ['Observações',       lead.observacoes],
+    ['Temperatura',       lead.temperatura],
+    ['Call',              lead.dataagendamento ? `${fmtDate(lead.dataagendamento)} às ${lead.horaagendamento || '—'}` : null],
+    ['Closer',            lead.closer ? (CLOSERS[lead.closer]?.name || lead.closer) : null],
+  ];
+
+  const line = '─'.repeat(32);
+  let text = `📋 BRIEFING — ${lead.nome || '—'}\n${line}\n`;
+  fields.forEach(([label, val]) => {
+    if (val) text += `${label}: ${val}\n`;
+  });
+
+  navigator.clipboard.writeText(text)
+    .then(() => toast(`Briefing de ${lead.nome} copiado!`, 'ok'))
+    .catch(() => toast('Não foi possível copiar.', 'err'));
 }
 
 // ─── TABLE ───────────────────────────────────────────────────────────
@@ -535,6 +759,11 @@ function fmtDate(d) {
   if (typeof d.toDate === 'function') d = d.toDate().toISOString().slice(0, 10);
   const [y, m, dd] = String(d).split('-');
   return `${dd}/${m}/${y}`;
+}
+
+function fmtDateHora(date, hora) {
+  if (!date) return '—';
+  return hora ? `${fmtDate(date)} · ${hora}` : fmtDate(date);
 }
 
 function esc(s) {
@@ -1301,12 +1530,12 @@ function toast(msg, type = 'ok') {
 // ─── EVENTS ──────────────────────────────────────────────────────────
 function bindEvents() {
   // filters
-  ['filter-origem','filter-status','filter-mes'].forEach(id =>
+  ['filter-origem','filter-mes'].forEach(id =>
     $(id).addEventListener('change', applyFilters)
   );
   $('filter-busca').addEventListener('input', applyFilters);
   $('btn-limpar').addEventListener('click', () => {
-    ['filter-origem','filter-status','filter-mes'].forEach(id => $(id).value = '');
+    ['filter-origem','filter-mes'].forEach(id => $(id).value = '');
     $('filter-busca').value = '';
     applyFilters();
   });
@@ -1382,6 +1611,14 @@ function bindEvents() {
   $('novo-lead-backdrop').addEventListener('click', e => {
     if (e.target === $('novo-lead-backdrop')) closeNovoLead();
   });
+
+  // tab navigation
+  document.querySelectorAll('.nav-link[data-tab]').forEach(btn =>
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab))
+  );
+
+  // agendamentos tab
+  $('btn-gerar-agenda').addEventListener('click', gerarAgendaDoDia);
 
   // auth buttons
   $('btn-login-google').addEventListener('click', loginWithGoogle);
