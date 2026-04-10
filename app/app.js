@@ -9,9 +9,17 @@ import {
 
 // ─── CLOSERS ─────────────────────────────────────────────────────────
 const CLOSERS = {
-  fernanda: { name: 'Fernanda', color: '#CE9221', bg: 'rgba(206,146,33,.12)', calLink: 'https://calendar.app.google/hWWi6tVKAhoXg5cUA' },
-  thomaz:   { name: 'Thomaz',   color: '#4db5c8', bg: 'rgba(77,181,200,.12)',  calLink: 'https://calendar.app.google/1heVe3395Tsk9GeM8' }
+  fernanda: { name: 'Fernanda', waName: 'Fernanda Ayub',      icon: '⭐', color: '#CE9221', bg: 'rgba(206,146,33,.12)', calLink: 'https://calendar.app.google/hWWi6tVKAhoXg5cUA' },
+  thomaz:   { name: 'Thomaz',   waName: 'Thomaz Empresarial', icon: '🧑', color: '#4db5c8', bg: 'rgba(77,181,200,.12)',  calLink: 'https://calendar.app.google/1heVe3395Tsk9GeM8' }
 };
+
+// ─── DATE HELPERS ────────────────────────────────────────────────────
+const DAYS = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+function getDayOfWeek(dateStr) {
+  if (!dateStr) return '';
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return DAYS[new Date(y, m-1, d).getDay()];
+}
 
 // ─── FIREBASE CONFIG ─────────────────────────────────────────────────
 const firebaseConfig = {
@@ -71,8 +79,37 @@ let activeTab     = 'agendamentos';
 let activeSub     = 'leads';
 let dragLeadId    = null;
 let cal = { step: 1, closer: null, leadSnap: null };
+let agendaCalYear  = 0;
+let agendaCalMonth = 0;
 
 const ETIQUETAS_DEFAULT = ['Super Lead', 'Bom', 'Neutro', 'Frio'];
+
+// ─── ETIQUETA COLORS ─────────────────────────────────────────────────
+const ETIQUETA_COLORS_KEY = 'fdv_etiqueta_colors';
+const ETIQUETA_COLORS_DEF = {
+  'Super Lead': '#CE9221',
+  'Bom':        '#4caf8e',
+  'Neutro':     '#4db5c8',
+  'Frio':       '#6B2737',
+};
+function getEtiquetaColors() {
+  try { const s = localStorage.getItem(ETIQUETA_COLORS_KEY); if (s) return { ...ETIQUETA_COLORS_DEF, ...JSON.parse(s) }; } catch(e) {}
+  return { ...ETIQUETA_COLORS_DEF };
+}
+function saveEtiquetaColor(tag, color) {
+  const s = localStorage.getItem(ETIQUETA_COLORS_KEY);
+  const obj = s ? JSON.parse(s) : {};
+  obj[tag] = color; localStorage.setItem(ETIQUETA_COLORS_KEY, JSON.stringify(obj));
+}
+function etiquetaChip(tag, sm = false) {
+  const hex = getEtiquetaColors()[tag];
+  let style = '';
+  if (hex) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    style = ` style="background:linear-gradient(135deg,rgba(${r},${g},${b},.22) 0%,rgba(${r},${g},${b},.10) 100%);border-color:rgba(${r},${g},${b},.44);color:${hex}"`;
+  }
+  return `<span class="etiqueta-chip${sm?' etiqueta-chip--sm':''}"${style}>${esc(tag)}</span>`;
+}
 
 // ─── AUTH ────────────────────────────────────────────────────────────
 function initAuth() {
@@ -237,12 +274,18 @@ function applyFilters() {
 
 // ─── AGENDA SUB ──────────────────────────────────────────────────────
 function renderAgendaSub() {
+  const dataFilt   = $('agenda-filter-data')?.value;
   const mesFilt    = $('agenda-filter-mes').value;
   const closerFilt = $('agenda-filter-closer').value;
   const content    = $('agenda-content');
 
+  // Mini cal — inicializa no mês atual se for a primeira vez
+  if (agendaCalYear === 0) { const n = new Date(); agendaCalYear = n.getFullYear(); agendaCalMonth = n.getMonth(); }
+  renderMiniCal(agendaCalYear, agendaCalMonth);
+
   let leads = allLeads.filter(l => l.status === 'agendado');
-  if (mesFilt)    leads = leads.filter(l => (l.dataagendamento || '').startsWith(mesFilt));
+  if (dataFilt)          leads = leads.filter(l => l.dataagendamento === dataFilt);
+  else if (mesFilt)      leads = leads.filter(l => (l.dataagendamento || '').startsWith(mesFilt));
   if (closerFilt) leads = leads.filter(l => (l.closer || '') === closerFilt);
 
   if (!leads.length) {
@@ -285,7 +328,7 @@ function renderAgendaSub() {
                 l.celular, l.origem, l.renda,
                 l.agendadopor ? 'via '+l.agendadopor : null
               ].filter(Boolean).map(esc).join(' · ')}</span>
-              ${(l.etiquetas||[]).length ? `<div class="card-etiquetas">${(l.etiquetas||[]).map(t=>`<span class="etiqueta-chip etiqueta-chip--sm">${esc(t)}</span>`).join('')}</div>` : ''}
+              ${(l.etiquetas||[]).length ? `<div class="card-etiquetas">${(l.etiquetas||[]).map(t=>etiquetaChip(t,true)).join('')}</div>` : ''}
             </div>
             <button class="btn-ghost btn-sm btn-briefing" data-id="${l.id}">Copiar Briefing</button>
           </div>`).join('')}
@@ -303,12 +346,14 @@ function renderAgendaSub() {
 
 // ─── BRIEFING SUB ────────────────────────────────────────────────────
 function renderBriefingSub() {
+  const dataFilt   = $('briefing-filter-data')?.value;
   const mesFilt    = $('briefing-filter-mes').value;
   const closerFilt = $('briefing-filter-closer').value;
   const content    = $('briefing-content');
 
   let leads = allLeads.filter(l => l.dataagendamento);
-  if (mesFilt)    leads = leads.filter(l => (l.dataagendamento||'').startsWith(mesFilt));
+  if (dataFilt)          leads = leads.filter(l => l.dataagendamento === dataFilt);
+  else if (mesFilt)      leads = leads.filter(l => (l.dataagendamento||'').startsWith(mesFilt));
   if (closerFilt) leads = leads.filter(l => (l.closer||'') === closerFilt);
   leads.sort((a,b) => ((a.dataagendamento||'')+(a.horaagendamento||'')).localeCompare((b.dataagendamento||'')+(b.horaagendamento||'')));
 
@@ -352,53 +397,151 @@ function renderBriefingSub() {
 }
 
 function gerarAgendaDoDia() {
+  const dataFilt   = $('agenda-filter-data')?.value;
   const mesFilt    = $('agenda-filter-mes').value;
   const closerFilt = $('agenda-filter-closer').value;
+
   let leads = allLeads.filter(l => l.status === 'agendado');
-  if (mesFilt)    leads = leads.filter(l => (l.dataagendamento||'').startsWith(mesFilt));
+  if (dataFilt)          leads = leads.filter(l => l.dataagendamento === dataFilt);
+  else if (mesFilt)      leads = leads.filter(l => (l.dataagendamento||'').startsWith(mesFilt));
   if (closerFilt) leads = leads.filter(l => (l.closer||'') === closerFilt);
   if (!leads.length) { toast('Nenhuma call para copiar.', 'err'); return; }
 
+  leads.sort((a,b) => ((a.dataagendamento||'')+(a.horaagendamento||'')).localeCompare((b.dataagendamento||'')+(b.horaagendamento||'')));
+
+  const refDate = dataFilt || leads[0]?.dataagendamento;
+  const dateStr = refDate ? fmtDate(refDate) : '—';
+  const dayName = refDate ? getDayOfWeek(refDate) : '';
+
   const groups = {};
   leads.forEach(l => { const k = l.closer||'_sem'; if(!groups[k]) groups[k]=[]; groups[k].push(l); });
-  Object.values(groups).forEach(arr => arr.sort((a,b)=>((a.dataagendamento||'')+(a.horaagendamento||'')).localeCompare((b.dataagendamento||'')+(b.horaagendamento||''))));
 
-  let text = `📅 AGENDA\n${'═'.repeat(36)}\n\n`;
+  let text = `Bom dia! ☀️\n📅 Agenda – ${dateStr} (${dayName})\n`;
+
   ['fernanda','thomaz',...Object.keys(groups).filter(k=>k!=='fernanda'&&k!=='thomaz')].filter(k=>groups[k]).forEach(key => {
-    const name = CLOSERS[key]?.name || (key==='_sem'?'Sem closer':key);
-    text += `👤 ${name.toUpperCase()}\n${'─'.repeat(36)}\n`;
+    const c      = CLOSERS[key];
+    const waName = c?.waName || c?.name || (key==='_sem'?'Sem closer':key);
+    const icon   = c?.icon || '👤';
+    text += `\n${icon} @${waName}\n`;
     groups[key].forEach(l => {
-      text += `${l.horaagendamento||'--:--'} ${fmtDate(l.dataagendamento)} — ${l.nome||'—'} | ${l.celular||'—'}`;
-      if (l.origem) text += ` | ${l.origem}`;
-      if (l.agendadopor) text += ` | via ${l.agendadopor}`;
-      text += '\n';
+      text += `🕐 ${l.horaagendamento||'--:--'} – ${l.nome||'—'}\n`;
+      text += `⏳ Status: Aguardando confirmação\n`;
     });
-    text += '\n';
   });
 
-  navigator.clipboard.writeText(text)
-    .then(() => toast('Agenda copiada!', 'ok'))
+  navigator.clipboard.writeText(text.trimEnd())
+    .then(() => toast('Agenda copiada para WhatsApp!', 'ok'))
     .catch(() => toast('Não foi possível copiar.', 'err'));
 }
 
 function gerarBriefingLead(lead) {
-  const closerName = lead.closer ? (CLOSERS[lead.closer]?.name||lead.closer) : null;
-  const fields = [
-    ['Nome', lead.nome], ['Celular', lead.celular], ['E-mail', lead.email],
-    ['Instagram', lead.instagram], ['Profissão', lead.profissao], ['Renda', lead.renda],
-    ['Origem', lead.origem], ['Etiquetas', (lead.etiquetas||[]).join(', ')],
-    ['Desafio', lead.desafio], ['Motivação', lead.motivacao],
-    ['Já participou', lead.jaParticipou], ['Já é aluna', lead.jaEAluna],
-    ['Tempo que conhece', lead.tempoConhece], ['De onde conhece', lead.deOnde],
-    ['Call', lead.dataagendamento ? `${fmtDate(lead.dataagendamento)} às ${lead.horaagendamento||'—'}` : null],
-    ['Closer', closerName], ['Agendado por', lead.agendadopor],
-    ['Observações', lead.observacoes],
-  ];
-  let text = `📋 BRIEFING — ${lead.nome||'—'}\n${'─'.repeat(32)}\n`;
-  fields.forEach(([l,v]) => { if(v) text += `${l}: ${v}\n`; });
+  // ── Closer: apenas nome, nunca telefone
+  const closerKey  = lead.closer || '';
+  const closerName = CLOSERS[closerKey]?.name || null;
+
+  // ── Instagram sem duplicar @
+  const instaRaw  = lead.instagram ? String(lead.instagram).trim() : '';
+  const instagram = instaRaw ? (instaRaw.startsWith('@') ? instaRaw : '@' + instaRaw) : null;
+
+  // ── Data/hora do agendamento
+  const refDate = lead.dataagendamento;
+  const dateStr = refDate ? fmtDate(refDate) : null;
+  const dayName = refDate ? getDayOfWeek(refDate) : null;
+  const hora    = lead.horaagendamento || null;
+
+  // ── Bloco 1: cabeçalho (sem linha em branco interna)
+  const header = [];
+  header.push(`*${(lead.nome || '—').trim()}*`);
+  if (dateStr && dayName && hora) header.push(`${dayName}, ${dateStr} · ${hora}`);
+  else if (dateStr && dayName)    header.push(`${dayName}, ${dateStr}`);
+  else if (dateStr)               header.push(dateStr);
+  if (closerName) header.push(`Closer: ${closerName}`);
+
+  // ── Bloco 2: contatos (apenas campos presentes, 3 emojis max)
+  const contatos = [
+    lead.celular ? `📞 ${lead.celular}` : null,
+    lead.email   ? `✉️ ${lead.email}`   : null,
+    instagram    ? `📸 ${instagram}`    : null,
+  ].filter(Boolean);
+
+  // ── Bloco 3: perfil (texto corrido, sem emojis)
+  const perfil = [];
+  if (lead.profissao && lead.renda) perfil.push(`${lead.profissao} · ${lead.renda}`);
+  else if (lead.profissao)          perfil.push(lead.profissao);
+  else if (lead.renda)              perfil.push(lead.renda);
+  if (lead.desafio) perfil.push(lead.desafio.trim());
+
+  // ── Monta texto: blocos separados por 1 linha em branco
+  const blocks = [header.join('\n')];
+  if (contatos.length) blocks.push(contatos.join('\n'));
+  if (perfil.length)   blocks.push(perfil.join('\n'));
+
+  const text = blocks.join('\n\n');
+
   navigator.clipboard.writeText(text)
     .then(() => toast(`Briefing de ${lead.nome} copiado!`, 'ok'))
     .catch(() => toast('Não foi possível copiar.', 'err'));
+}
+
+// ─── MINI CALENDÁRIO ─────────────────────────────────────────────────
+const MCAL_MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function renderMiniCal(year, month) {
+  const cal = $('agenda-mini-cal');
+  if (!cal) return;
+
+  const selectedDate = $('agenda-filter-data')?.value || '';
+  const today = new Date().toISOString().slice(0,10);
+  const ym = `${year}-${String(month+1).padStart(2,'0')}`;
+
+  const daysWithCalls = new Set(
+    allLeads
+      .filter(l => l.status === 'agendado' && (l.dataagendamento||'').startsWith(ym))
+      .map(l => l.dataagendamento)
+  );
+
+  const firstDay    = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let grid = '';
+  for (let i = 0; i < firstDay; i++) grid += `<div class="mcal-day mcal-day--empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso  = `${ym}-${String(d).padStart(2,'0')}`;
+    const cls  = ['mcal-day',
+      daysWithCalls.has(iso)          ? 'mcal-day--calls' : '',
+      selectedDate === iso            ? 'mcal-day--sel' : '',
+      iso === today && selectedDate !== iso ? 'mcal-day--today' : '',
+    ].filter(Boolean).join(' ');
+    grid += `<button class="${cls}" data-date="${iso}">${d}</button>`;
+  }
+
+  cal.innerHTML = `
+    <div class="mcal-nav-row">
+      <button class="mcal-arrow" id="mcal-prev">‹</button>
+      <span class="mcal-month-lbl">${MCAL_MONTHS[month]} ${year}</span>
+      <button class="mcal-arrow" id="mcal-next">›</button>
+    </div>
+    <div class="mcal-weekdays"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
+    <div class="mcal-grid">${grid}</div>
+  `;
+
+  cal.querySelector('#mcal-prev').addEventListener('click', () => {
+    agendaCalMonth--; if (agendaCalMonth < 0)  { agendaCalMonth = 11; agendaCalYear--; }
+    renderMiniCal(agendaCalYear, agendaCalMonth);
+  });
+  cal.querySelector('#mcal-next').addEventListener('click', () => {
+    agendaCalMonth++; if (agendaCalMonth > 11) { agendaCalMonth = 0;  agendaCalYear++; }
+    renderMiniCal(agendaCalYear, agendaCalMonth);
+  });
+  cal.querySelectorAll('.mcal-day[data-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const datePicker = $('agenda-filter-data');
+      if (datePicker) datePicker.value = datePicker.value === btn.dataset.date ? '' : btn.dataset.date;
+      renderMiniCal(agendaCalYear, agendaCalMonth);
+      renderAgendaSub();
+    });
+  });
 }
 
 // ─── KANBAN ──────────────────────────────────────────────────────────
@@ -483,6 +626,19 @@ function renderKanban() {
   board.querySelectorAll('.btn-kanban-noshow').forEach(b =>
     b.addEventListener('click', async () => { currentId=b.dataset.id; await handlePostCall('noshow'); })
   );
+
+  // Obs pós-call — salva no blur
+  board.querySelectorAll('.kc-obs-input').forEach(ta => {
+    ta.addEventListener('mousedown', e => e.stopPropagation()); // impede drag
+    ta.addEventListener('blur', async () => {
+      const id  = ta.dataset.id;
+      const obs = ta.value.trim();
+      const lead = allLeads.find(l => l.id === id);
+      if (!lead || obs === (lead.obs_call || '').trim()) return;
+      try { await saveLead(id, { obs_call: obs, atualizadoem: new Date().toISOString() }); }
+      catch(e) { toast('Erro ao salvar obs.', 'err'); }
+    });
+  });
 }
 
 function kanbanCard(l) {
@@ -495,7 +651,7 @@ function kanbanCard(l) {
       <button class="kc-nome" data-perfil="${l.id}">${esc(l.nome||'—')}</button>
       ${badgeStatus(l.status)}
     </div>
-    ${etiquetas.length ? `<div class="kc-etiquetas">${etiquetas.map(t=>`<span class="etiqueta-chip etiqueta-chip--sm">${esc(t)}</span>`).join('')}</div>` : ''}
+    ${etiquetas.length ? `<div class="kc-etiquetas">${etiquetas.map(t=>etiquetaChip(t,true)).join('')}</div>` : ''}
     ${l.dataagendamento ? `<div class="kc-datetime">📅 ${fmtDateHora(l.dataagendamento,l.horaagendamento)}</div>` : ''}
     <div class="kc-meta">
       ${closerName ? `<span class="kc-closer">${esc(closerName)}</span>` : ''}
@@ -505,6 +661,9 @@ function kanbanCard(l) {
     <div class="kc-foot">
       ${isAgendado ? `<button class="btn-kanban-noshow" data-id="${l.id}">No Show</button>` : ''}
       <button class="btn-kanban-resultado" data-id="${l.id}">${isAgendado?'Resultado →':'Ver →'}</button>
+    </div>
+    <div class="kc-obs-wrap">
+      <textarea class="kc-obs-input" data-id="${l.id}" placeholder="Obs. pós-call…">${esc(l.obs_call||'')}</textarea>
     </div>
   </div>`;
 }
@@ -542,10 +701,10 @@ function renderRelatorios() {
   const noShows    = base.filter(l => l.status === 'noshow');
   const vendas     = base.filter(l => l.venda_realizada === true);
 
-  const taxaComp = agendados.length  ? pct(realizadas.length, agendados.length)  : 0;
-  const taxaConv = realizadas.length ? pct(vendas.length,     realizadas.length) : 0;
-
+  const taxaComp    = agendados.length  ? pct(realizadas.length, agendados.length)  : 0;
+  const taxaConv    = realizadas.length ? pct(vendas.length,     realizadas.length) : 0;
   const faturamento = vendas.reduce((s,l) => s + parseValor(l.valor_venda), 0);
+  const ticketMedio = vendas.length ? Math.round(faturamento / vendas.length) : 0;
 
   // Por closer
   const closerMap = {};
@@ -600,31 +759,79 @@ function renderRelatorios() {
       <strong class="stat-num">${val}</strong>
     </div>`;
 
+  // ── Ranking de origem por conversão
+  const origemRanking = Object.entries(origemMap)
+    .map(([o,d]) => ({ o, ...d, conv: d.realizadas ? pct(d.vendas,d.realizadas) : 0 }))
+    .sort((a,b) => b.conv - a.conv || b.vendas - a.vendas);
+  const maxLeads = Math.max(...Object.values(origemMap).map(d=>d.total), 1);
+
+  // ── Comparativo mês a mês
+  const mesEntries = Object.entries(mesMap).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxMesLeads = Math.max(...mesEntries.map(([,d])=>d.total), 1);
+
   $('relatorios-content').innerHTML = `
     <div class="stats-grid rel-summary">
       ${relStatCard('Total de Leads', base.length, '◈')}
       ${relStatCard('Comparecimento', taxaComp+'%', '◉', 'accent-petro')}
       ${relStatCard('Conversão', taxaConv+'%', '◆', 'accent-green')}
       ${relStatCard('Faturamento', 'R$\xa0'+fmtValor(faturamento), '◈', 'accent-sand')}
-      ${relStatCard('No Shows', noShows.length, '✕', 'accent-marsala')}
+      ${relStatCard('Ticket Médio', ticketMedio ? 'R$\xa0'+fmtValor(ticketMedio) : '—', '◈', 'accent-gold')}
       ${relStatCard('Vendas', vendas.length, '✦', 'accent-gold')}
     </div>
 
-    ${relTable('Leads por Mês', ['Mês','Leads','Realizadas','Vendas','No Shows','Faturamento'],
-      Object.entries(mesMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([m,d])=>
-        [fmtMes(m), d.total, d.realizadas, d.vendas, d.noShows, d.valor?'R$\xa0'+fmtValor(d.valor):'—'])
+    ${mesEntries.length >= 2 ? `
+    <div class="rel-section">
+      <h3 class="rel-section-title">Comparativo Mês a Mês</h3>
+      <div class="rel-chart">
+        ${mesEntries.map(([m,d]) => `
+          <div class="rel-chart-row">
+            <span class="rel-chart-lbl">${fmtMes(m)}</span>
+            <div class="rel-chart-bars">
+              <div class="rel-bar rel-bar--leads"  style="width:${pct(d.total,maxMesLeads)}%" title="${d.total} leads"></div>
+              <div class="rel-bar rel-bar--vendas"  style="width:${pct(d.vendas,maxMesLeads)}%" title="${d.vendas} vendas"></div>
+            </div>
+            <span class="rel-chart-val">${d.total} leads · ${d.vendas} vendas${d.valor?' · R$\xa0'+fmtValor(d.valor):''}</span>
+          </div>`).join('')}
+        <div class="rel-chart-legend">
+          <span class="rel-legend-item"><i class="rel-legend-dot rel-legend-dot--leads"></i>Leads</span>
+          <span class="rel-legend-item"><i class="rel-legend-dot rel-legend-dot--vendas"></i>Vendas</span>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div class="rel-section">
+      <h3 class="rel-section-title">Ranking de Origem — Conversão</h3>
+      <div class="rel-origin-rank">
+        ${origemRanking.map((r,i) => `
+          <div class="rel-rank-row">
+            <span class="rel-rank-pos">${i+1}</span>
+            <div class="rel-rank-info">
+              <div class="rel-rank-name">${esc(r.o)}</div>
+              <div class="rel-rank-bar-wrap">
+                <div class="rel-rank-bar" style="width:${pct(r.total,maxLeads)}%"></div>
+              </div>
+            </div>
+            <div class="rel-rank-nums">
+              <span class="rel-rank-conv${r.conv>=50?' rel-rank-conv--hi':r.conv>=25?' rel-rank-conv--mid':''}">${r.conv}%</span>
+              <span class="rel-rank-sub">${r.total} leads · ${r.vendas} vendas</span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    ${relTable('Leads por Mês', ['Mês','Leads','Realizadas','Vendas','No Shows','Faturamento','Ticket Médio'],
+      Object.entries(mesMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([m,d])=> {
+        const tm = d.vendas ? Math.round(d.valor/d.vendas) : 0;
+        return [fmtMes(m), d.total, d.realizadas, d.vendas, d.noShows,
+          d.valor?'R$\xa0'+fmtValor(d.valor):'—',
+          tm?'R$\xa0'+fmtValor(tm):'—'];
+      })
     )}
 
-    ${relTable('Resultado por Closer', ['Closer','Agendados','Realizadas','Vendas','Faturamento','Conv.'],
+    ${relTable('Taxa de Conversão por Closer', ['Closer','Agendados','Realizadas','Vendas','Faturamento','Conv.'],
       Object.entries(closerMap).map(([c,d])=>
         [CLOSERS[c]?.name||c, d.agendados, d.realizadas, d.vendas,
          d.valor?'R$\xa0'+fmtValor(d.valor):'—',
-         d.realizadas?pct(d.vendas,d.realizadas)+'%':'—'])
-    )}
-
-    ${relTable('Resultado por Origem', ['Origem','Leads','Agendados','Realizadas','Vendas','Conv.'],
-      Object.entries(origemMap).sort((a,b)=>b[1].total-a[1].total).map(([o,d])=>
-        [o, d.total, d.agendados, d.realizadas, d.vendas,
          d.realizadas?pct(d.vendas,d.realizadas)+'%':'—'])
     )}
 
@@ -677,7 +884,7 @@ function renderTable() {
         </span>`
       : '—';
     const etiq = (l.etiquetas||[]).length
-      ? (l.etiquetas||[]).slice(0,2).map(t=>`<span class="etiqueta-chip etiqueta-chip--sm">${esc(t)}</span>`).join('')
+      ? (l.etiquetas||[]).slice(0,2).map(t=>etiquetaChip(t,true)).join('')
       : '—';
     return `<tr data-id="${l.id}" class="${selectedIds.has(l.id)?'row-selected':''}">
       <td class="cell-chk"><input type="checkbox" class="row-chk" data-id="${l.id}" ${selectedIds.has(l.id)?'checked':''}></td>
@@ -726,7 +933,7 @@ function renderCards() {
     return;
   }
   wrap.innerHTML = filteredLeads.map(l => {
-    const etiquetas = (l.etiquetas||[]).map(t=>`<span class="etiqueta-chip etiqueta-chip--sm">${esc(t)}</span>`).join('');
+    const etiquetas = (l.etiquetas||[]).map(t=>etiquetaChip(t,true)).join('');
     const agendInfo = (l.status==='agendado' && l.dataagendamento)
       ? `<div class="card-agenda-info">📅 ${fmtDateHora(l.dataagendamento,l.horaagendamento)} · ${esc(CLOSERS[l.closer]?.name||l.closer||'—')}</div>` : '';
     return `<div class="lead-card" data-id="${l.id}">
@@ -1069,19 +1276,53 @@ function buildHistorico(lead) {
 }
 
 // ─── ETIQUETAS ───────────────────────────────────────────────────────
+function chipInlineStyle(hex) {
+  if (!hex) return '';
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `background:linear-gradient(135deg,rgba(${r},${g},${b},.22) 0%,rgba(${r},${g},${b},.10) 100%);border-color:rgba(${r},${g},${b},.44);color:${hex}`;
+}
+
 function renderEtiquetas(lead) {
-  const tags = lead.etiquetas || [];
-  $('etiquetas-chips').innerHTML = tags.map(t => `
-    <span class="etiqueta-chip">
+  const tags   = lead.etiquetas || [];
+  const colors = getEtiquetaColors();
+
+  $('etiquetas-chips').innerHTML = tags.map(t => {
+    const hex  = colors[t];
+    const s    = chipInlineStyle(hex);
+    return `<span class="etiqueta-chip etiqueta-chip--editable"${s?` style="${s}"`:''}>
+      <input type="color" class="etiqueta-color-pick" data-tag="${esc(t)}" value="${hex||'#CE9221'}" title="Cor">
+      <button class="etiqueta-swatch" data-tag="${esc(t)}"${hex?` style="background:${hex}"`:''} title="Mudar cor">⬤</button>
       ${esc(t)}
       <button class="etiqueta-remove" data-tag="${esc(t)}" title="Remover">×</button>
-    </span>`).join('');
-  $('etiquetas-defaults').innerHTML = ETIQUETAS_DEFAULT.map(t => `
-    <button class="etiqueta-default${tags.includes(t)?' active':''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('');
+    </span>`;
+  }).join('');
+
+  $('etiquetas-defaults').innerHTML = ETIQUETAS_DEFAULT.map(t => {
+    const active = tags.includes(t);
+    const hex    = colors[t];
+    const s      = active ? chipInlineStyle(hex) : '';
+    return `<button class="etiqueta-default${active?' active':''}" data-tag="${esc(t)}"${s?` style="${s}"`:''}>
+      ${hex ? `<span class="etiqueta-swatch-sm" style="background:${hex}"></span>` : ''}${esc(t)}
+    </button>`;
+  }).join('');
 
   $('etiquetas-chips').querySelectorAll('.etiqueta-remove').forEach(btn =>
     btn.addEventListener('click', () => toggleEtiqueta(lead.id, btn.dataset.tag, 'remove'))
   );
+  $('etiquetas-chips').querySelectorAll('.etiqueta-swatch').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      btn.parentElement.querySelector('.etiqueta-color-pick')?.click();
+    });
+  });
+  $('etiquetas-chips').querySelectorAll('.etiqueta-color-pick').forEach(inp => {
+    inp.addEventListener('input', () => {
+      saveEtiquetaColor(inp.dataset.tag, inp.value);
+      const idx = allLeads.findIndex(l => l.id === lead.id);
+      if (idx !== -1) renderEtiquetas(allLeads[idx]);
+      renderAll();
+    });
+  });
   $('etiquetas-defaults').querySelectorAll('.etiqueta-default').forEach(btn =>
     btn.addEventListener('click', () => toggleEtiqueta(lead.id, btn.dataset.tag, 'toggle'))
   );
@@ -1420,10 +1661,12 @@ function bindEvents() {
 
   // Agenda filters
   ['agenda-filter-mes','agenda-filter-closer'].forEach(id => $(id).addEventListener('change', renderAgendaSub));
+  $('agenda-filter-data')?.addEventListener('change', renderAgendaSub);
   $('btn-gerar-agenda').addEventListener('click', gerarAgendaDoDia);
 
   // Briefing filters
   ['briefing-filter-mes','briefing-filter-closer'].forEach(id => $(id).addEventListener('change', renderBriefingSub));
+  $('briefing-filter-data')?.addEventListener('change', renderBriefingSub);
 
   // Kanban filters
   ['kanban-filter-mes','kanban-filter-closer'].forEach(id => $(id).addEventListener('change', renderKanban));

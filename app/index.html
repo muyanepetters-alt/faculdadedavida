@@ -216,32 +216,54 @@
   <div id="sub-agenda" class="sub-panel" style="display:none">
     <div class="agenda-top">
       <div class="agenda-filters">
-        <select class="filter-select" id="agenda-filter-mes">
-          <option value="">Todos os meses</option>
-        </select>
-        <select class="filter-select" id="agenda-filter-closer">
-          <option value="">Todos os closers</option>
-          <option value="fernanda">Fernanda</option>
-          <option value="thomaz">Thomaz</option>
-        </select>
+        <div>
+          <label class="agenda-date-label" for="agenda-filter-mes">Mês</label>
+          <select class="filter-select" id="agenda-filter-mes">
+            <option value="">Todos os meses</option>
+          </select>
+        </div>
+        <div>
+          <label class="agenda-date-label" for="agenda-filter-closer">Closer</label>
+          <select class="filter-select" id="agenda-filter-closer">
+            <option value="">Todos os closers</option>
+            <option value="fernanda">Fernanda</option>
+            <option value="thomaz">Thomaz</option>
+          </select>
+        </div>
+        <input type="date" class="filter-input filter-input--date" id="agenda-filter-data" style="display:none">
       </div>
-      <button class="btn-primary" id="btn-gerar-agenda">📋 Copiar Agenda</button>
+      <button class="btn-primary" id="btn-gerar-agenda">📱 Copiar para WhatsApp</button>
     </div>
-    <div id="agenda-content"></div>
+    <div class="agenda-layout">
+      <div class="agenda-sidebar">
+        <div id="agenda-mini-cal"></div>
+      </div>
+      <div id="agenda-content"></div>
+    </div>
   </div><!-- /sub-agenda -->
 
   <!-- ─── SUB: BRIEFING ─── -->
   <div id="sub-briefing" class="sub-panel" style="display:none">
     <div class="agenda-top">
       <div class="agenda-filters">
-        <select class="filter-select" id="briefing-filter-mes">
-          <option value="">Todos os meses</option>
-        </select>
-        <select class="filter-select" id="briefing-filter-closer">
-          <option value="">Todos os closers</option>
-          <option value="fernanda">Fernanda</option>
-          <option value="thomaz">Thomaz</option>
-        </select>
+        <div>
+          <label class="agenda-date-label" for="briefing-filter-data">Data</label>
+          <input type="date" class="filter-input filter-input--date" id="briefing-filter-data">
+        </div>
+        <div>
+          <label class="agenda-date-label" for="briefing-filter-mes">Mês</label>
+          <select class="filter-select" id="briefing-filter-mes">
+            <option value="">Todos os meses</option>
+          </select>
+        </div>
+        <div>
+          <label class="agenda-date-label" for="briefing-filter-closer">Closer</label>
+          <select class="filter-select" id="briefing-filter-closer">
+            <option value="">Todos os closers</option>
+            <option value="fernanda">Fernanda</option>
+            <option value="thomaz">Thomaz</option>
+          </select>
+        </div>
       </div>
     </div>
     <div id="briefing-content"></div>
